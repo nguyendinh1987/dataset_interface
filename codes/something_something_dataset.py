@@ -5,6 +5,8 @@ import glob
 import sys, os
 from sklearn.utils import shuffle
 import pandas as pd 
+import matplotlib.pyplot as plt
+import copy
 
 class sthsth(object):
     '''
@@ -24,7 +26,9 @@ class sthsth(object):
         self.outFo = "/opt/workspace/output" if "prog_output" not in kargs.keys() else kargs["prog_output"]
         self.labelFi = "something-something-v1-labels.csv" if "alllabels_file" not in kargs.keys() else kargs["alllabels_file"]
         ## load data info
+        print("Get labels")
         self._getAllLabels()
+        print("Get file list")
         self._getFileList()
     
     ## utis
@@ -32,10 +36,10 @@ class sthsth(object):
         self.labels = pd.read_csv(self.labelFi,usecols=[0,1],header=None)
         if self.verbose:
             print("There are {} actions".format(self.labels.shape[0]))
-            print(self.labels.iloc[0][0])
-            print(self.labels[self.labels[0]=="Folding something"].index.tolist()[0])
+            # print(self.labels.iloc[0][0])
+            # print(self.labels[self.labels[0]=="Folding something"].index.tolist()[0])
             # to get label description: use self.labels.iloc[id][0]
-            # to get label id: use self.labels[self.labels==<label_description>].index.tolist()[0]
+            # to get label id: use self.labels[self.labels[0]==<label_description>].index.tolist()[0]
         return True
     
     def _getFileList(self):
@@ -43,10 +47,146 @@ class sthsth(object):
         if self.verbose:
             print("There are {} files".format(self.files.shape[0]))
         return True
+
+    def _getLabelId(self,vnum):
+        findex = self.files[self.files[0]==vnum].index.tolist()[0]
+        fdes = self.files.iloc[findex][1]
+        lid = self.labels[self.labels[0]==fdes].index.tolist()[0]
+        # if self.verbose:
+        #     print("vnum: {}; lid: {}; des: {}".format(vnum,lid,fdes))
+        return lid
     
     ## interface with data
-    def get_video(self,vnum = None):
-        return True 
+    def get_nclasses(self):
+        return self.labels.shape[0]
+
+    def get_video(self,vnum = None,wh = None, rootF = "20bn-something-something-v1",isshow=False,ts=15,isgrey=False):
+        if vnum is None:
+            vnum = rng.randint(0,self.files.shape[0])
+        path_to_video = os.path.join(self.rootFo,rootF,str(vnum))
+        frame_list = glob.glob(path_to_video+"/*.jpg")
+        frame_nums = [int(fn.split("/")[-1].split(".")[0]) for fn in frame_list]
+        frame_indices = np.argsort(frame_nums)
+        frame_list = [frame_list[fid] for fid in frame_indices]
+
+        v = []
+        for fl in frame_list:
+            frame = cv2.imread(fl)
+            if isgrey:
+                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+            if wh is not None:
+                frame = cv2.resize(frame,(wh[0],wh[1]))
+            v.append(frame)
+
+        if isshow:
+            for f in v:
+                cv2.imshow("v",f)
+                cv2.waitKey(ts)
+                cv2.destroyWindow("v")
+        
+        return v
+    
+    def get_hist_vlength(self,rootF = "20bn-something-something-v1"):
+        vl = [0 for i in range(self.files.shape[0])]
+        for f in range(len(vl)):
+            if f%50==0:
+                print("process [{}/{}]".format(f,self.files.shape[0]))
+            path_to_video = os.path.join(self.rootFo,rootF,str(self.files.iloc[f][0]))
+            frames = glob.glob(path_to_video+"/*.jpg")
+            assert len(frames)>0, "Error reading {}".format(path_to_video)
+            vl[f] = len(frames)
+
+        vl = np.array(vl)
+        n, bins, patches = plt.hist(vl,50, density=True, facecolor='g', alpha=0.75)
+        plt.xlabel('video length')
+        plt.ylabel('Prob')
+        plt.title('Histogram of video lengths')
+        # plt.text(60, .025, r'$\mu=100,\ \sigma=15$')
+        # plt.xlim(40, 160)
+        # plt.ylim(0, 0.03)
+        plt.grid(True)
+        plt.show()
+
+        return n,bins,patches
+    
+    def merge_segchg(self,data,do_check=False):
+        '''
+        data must have five dimension [batch_size,seg,h,w,c]
+        Function will convert it into [batch_size,h,w,c*seg]
+        '''
+        bsz,sg,h,w,c = data.shape
+        data = np.transpose(data,(0,2,3,4,1)).reshape((bsz,h,w,sg*c))
+        if do_check and c == 1:
+            for bid in range(bsz):
+                for fid in range(sg):
+                    cv2.imshow("frames_{}".format(bid),data[bid,:,:,fid]/255)
+                    cv2.waitKey(150)
+                cv2.destroyWindow("frames_{}".format(bid))
+        return data
+    
+    def gen_batch(self,isshuffle=True,merge_sgch=False,**kargs):
+        # print("xxxx")
+        bsz = kargs["bsz"]
+        filelist = self.files[0].values
+        nfiles = filelist.shape[0]
+        # print("nfiles: {}; bsz: {}".format(nfiles,bsz))
+        npatches = np.floor(nfiles/bsz).astype(np.int16)+1
+        # print(npatches)
+        
+        while True:
+            if isshuffle:
+                filelist = shuffle(filelist)
+            for p in range(npatches):
+                # print("{} of {}".format(p+1,npatches))
+                internal_bsz = min((p+1)*bsz,nfiles)-p*bsz
+                # print("int_bsz: {}; bsz: {}".format(internal_bsz,bsz))
+                internal_kargs = copy.copy(kargs)
+                internal_kargs["bsz"] = internal_bsz
+                startp = p*bsz
+                endp = startp+internal_bsz
+                vlist = filelist[startp:endp]
+                data,target = self.get_batch(vlist=vlist,**internal_kargs)
+                if merge_sgch:
+                    data = self.merge_segchg(data)
+                del internal_kargs
+                # print("end gen_batch")
+                yield (data,target)
+
+    def get_batch(self,vlist = None, bsz = 1, nseg=8, wh = None, isgrey=False, check_bsz = False):
+        if vlist is None:
+            fcids = rng.choice(self.files.shape[0],bsz,replace=False)
+            vlist = self.files[0][fcids]
+        else:
+            assert len(vlist)>=bsz, "number of videos in vlist should be larger than batch size (bsz)"
+        # print(vlist)
+
+        if isgrey:
+            data = np.zeros((bsz,nseg,wh[1],wh[0],1))
+        else:
+            data = np.zeros((bsz,nseg,wh[1],wh[0],3))
+        
+        target = [0 for i in range(bsz)]
+        for bid, vid in enumerate(vlist):
+            if bid+1 > bsz:
+                break
+            v = self.get_video(vnum=vid,wh=wh,isgrey=isgrey)#,isshow=check_bsz,ts=50)
+            data_patch = np.linspace(0,len(v),nseg,endpoint=False).astype(np.int16)
+            for pid in range(1,len(data_patch)):
+                fid = rng.choice(range(data_patch[pid-1],data_patch[pid]),1,replace=False)[0]
+                if isgrey:
+                    data[bid,pid-1] = np.expand_dims(v[fid],axis=-1)
+                else:
+                    data[bid,pid-1] = v[fid]
+            target[bid] = self._getLabelId(vid)
+        
+        if check_bsz:
+            for bid in range(bsz):
+                for fid in range(nseg):
+                    cv2.imshow("frames_{}".format(bid),data[bid,fid]/255)
+                    cv2.waitKey(150)
+                cv2.destroyWindow("frames_{}".format(bid))
+        # print("end get_batch")
+        return data, target
 # class lfw_face(object):
 #     def __init__(self,rootF,**kargs):
 #         assert rootF is not None, "No path to dataset"

@@ -10,4 +10,44 @@ config["alllabels_file"] = "/opt/Data/sthsthV1/datasplit_label/something-somethi
 config["filelistFi"] = "/opt/Data/sthsthV1/datasplit_label/something-something-v1-train.csv"
 
 sthsth_data = sthsth(**config)
+test_config = {}
+test_config["get_video"] = False
+test_config["_getLabelId"] = False
+test_config["get_batch"] = False
+test_config["gen_batch"] = False
+test_config["get_hist_vlength"] = False
+test_config["merge_segchg"] = True
+
+if test_config["get_video"]:
+    print("Test get_video")
+    v = sthsth_data.get_video(vnum=17,isshow=True,ts=150,isgrey=True)
+
+if test_config["_getLabelId"]:
+    print("test _getLabelId")
+    lid = sthsth_data._getLabelId(vnum=11778)
+
+if test_config["get_batch"]:
+    print("test get_batch")
+    sthsth_data.get_batch(bsz=10,wh=[130,100],check_bsz=True)
+
+if test_config["gen_batch"]:
+    print("test gen_batch")
+    batch_gen = sthsth_data.gen_batch(isshuffle=True,bsz=5,wh=[130,100],check_bsz=True)
+    for _ in range(5):
+        print("start gen batch")
+        for a in batch_gen:
+            print("data shape")
+            print(a[0].shape)
+            break
+
+if test_config["get_hist_vlength"]:
+    print("test get_hist_vlength")
+    _,_,_ = sthsth_data.get_hist_vlength()
+
+if test_config["merge_segchg"]:
+    print("check merge seg and channel")
+    print("Loading data ....")
+    data,_ = sthsth_data.get_batch(bsz=10,wh=[130,100],check_bsz=True,isgrey=True)
+    print(("Merging dimension ...."))
+    data = sthsth_data.merge_segchg(data,do_check=True)
 
