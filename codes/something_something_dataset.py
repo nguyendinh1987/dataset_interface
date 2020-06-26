@@ -124,6 +124,81 @@ class sthsth(object):
                 cv2.destroyWindow("frames_{}".format(bid))
         return data
     
+    def vcrop(self,v,fwh,ctcrop,ncrop):
+        batch_v = []
+        for nc in range(ncrop):
+            hw = v[0].shape[0:-1]
+            if ctcrop:
+                hwc = [x/2 for x in hw]
+                hwdis = [fwh[1-i]/2 for i in range(2)]
+                hwstart = [max(0,int(hwc[i]-hwdis[1-i])) for i in range(2)]
+            else:
+                hwstart = [0,0]
+                hwstart[0] = rng.choice(hw[0]-fwh[1],1,replace=False)[0]
+                hwstart[1] = rng.choice(hw[1]-fwh[0],1,replace=False)[0]
+
+            hwend = [min(hw[i],hwstart[i]+fwh[1-i]) for i in range(2)]
+            # print([whstart[i] for i in range(2)])
+            # print([whend[i] for i in range(2)])
+            newv = v.copy()
+            for fid in range(len(v)):
+                # newv[fid] = cv2.rectangle(newv[fid],(hwstart[1],hwstart[0]),(hwend[1],hwend[0]),color=(0,255,0),thickness=3)
+                # newv[fid] = cv2.resize(newv[fid],(fwh[0],fwh[1]))
+                newv[fid] = newv[fid][hwstart[0]:hwend[0],hwstart[1]:hwend[1]]
+            batch_v.append(newv)
+        return batch_v
+
+    def kratio_crop(self,v,fwh,minsz,ctcrop,ncrop):
+        orgs = [x for x in v[0].shape][0:-1] 
+        shortestd = np.argmin(orgs)# 1 -> w, 0->h
+        rs_ratio = minsz/orgs[shortestd]
+        
+        if shortestd == 0:
+            newsize = (minsz,int(orgs[1]*rs_ratio)) 
+        else:
+            newsize = (int(orgs[0]*rs_ratio),minsz) 
+        for fid in range(len(v)):
+            v[fid] = cv2.resize(v[fid],newsize)
+
+        assert newsize[0]>=fwh[1], "target height must be smaller than image height: tgsize: {}; imgsize: {}".format(fwh[1],newsize[0])
+        assert newsize[1]>=fwh[0], "target width must be smaller than image width: tgsize: {}; imgsize: {}".format(fwh[0],newsize[1])
+
+        if ctcrop:
+            print("set ctcrop to False for multiple cropping processes")
+            ncrop = 1
+        
+        return self.vcrop(v,fwh,ctcrop,ncrop)
+        
+    def rratio_crop(self,v,fwh,maxrsize,ctcrop,ncrop):
+        hw = v[0].shape[0:-1]
+        batch_v = []
+        for n in range(ncrop):
+            rsize = rng.uniform(1.0,maxrsize)
+            newsize = [int(hw[i]*rsize) for i in range(2)]
+            for fid in range(len(v)):
+                v[fid] = cv2.resize(v[fid],tuple(newsize))
+
+            assert newsize[0]>fwh[1], "target height must be smaller than image height: tgsize: {}; imgsize: {}".format(fwh[1],newsize[0])
+            assert newsize[1]>fwh[0], "target width must be smaller than image width: tgsize: {}; imgsize: {}".format(fwh[0],newsize[1])
+
+            tmp_b = self.vcrop(v,fwh,ctcrop,1)[0]
+            batch_v.append(tmp_b)
+
+        return batch_v
+    def video_augs(self,v,fwh,kratio,minsz,rsize,ctcrop,ncrop):
+        '''
+        fwh: final size of augmented frames
+        kratio; [True,False] keep original ratio or not
+        minsz: if kratio == True, frames are resized so that the shorted size = minsz
+        rsize; It is rateresize. if kratio == False, frames are resized randomly with ratio from 1 to rsize
+        ctcrop: if it is True, only provide center crop, otherwise it will provide random crop
+        ncrop: a number of crop
+        '''
+        if kratio:
+            return self.kratio_crop(v,fwh,minsz,ctcrop,ncrop)
+        else:
+            return self.rratio_crop(v,fwh,rsize,ctcrop,ncrop)
+        
     def gen_batch(self,isshuffle=True,merge_sgch=False,**kargs):
         # print("xxxx")
         bsz = kargs["bsz"]
@@ -152,35 +227,53 @@ class sthsth(object):
                 # print("end gen_batch")
                 yield (data,target)
 
-    def get_batch(self,vlist = None, bsz = 1, nseg=8, wh = None, isgrey=False, check_bsz = False):
+    def get_batch(self,vlist = None, nv = 1, nseg=8, wh = None, isgrey=False, augconf = None, check_bsz = False):
         if vlist is None:
-            fcids = rng.choice(self.files.shape[0],bsz,replace=False)
+            fcids = rng.choice(self.files.shape[0],nv,replace=False)
             vlist = self.files[0][fcids]
         else:
-            assert len(vlist)>=bsz, "number of videos in vlist should be larger than batch size (bsz)"
+            assert len(vlist)>=nv, "number of videos in vlist should be larger than batch size (bsz)"
         # print(vlist)
-
-        if isgrey:
-            data = np.zeros((bsz,nseg,wh[1],wh[0],1))
+        
+        if augconf is not None:
+            fwh = augconf['fwh'] # to video with its original size for doing augmentation
         else:
-            data = np.zeros((bsz,nseg,wh[1],wh[0],3))
-        
-        target = [0 for i in range(bsz)]
+            fwh = wh
+
+        # if isgrey:
+        #     data = np.zeros((bsz,nseg,fwh[1],fwh[0],1))
+        # else:
+        #     data = np.zeros((bsz,nseg,fwh[1],fwh[0],3))
+        data = []
+        target = []#[0 for i in range(bsz)]
         for bid, vid in enumerate(vlist):
-            if bid+1 > bsz:
+            if bid+1 > nv:
                 break
-            v = self.get_video(vnum=vid,wh=wh,isgrey=isgrey)#,isshow=check_bsz,ts=50)
-            data_patch = np.linspace(0,len(v),nseg,endpoint=False).astype(np.int16)
-            for pid in range(1,len(data_patch)):
-                fid = rng.choice(range(data_patch[pid-1],data_patch[pid]),1,replace=False)[0]
-                if isgrey:
-                    data[bid,pid-1] = np.expand_dims(v[fid],axis=-1)
-                else:
-                    data[bid,pid-1] = v[fid]
-            target[bid] = self._getLabelId(vid)
+
+            if augconf is not None:
+                v = self.get_video(vnum=vid,isgrey=isgrey)#,isshow=check_bsz,ts=50)
+                batch_v = self.video_augs(v,**augconf)
+            else:
+                batch_v = [self.get_video(vnum=vid,wh=fwh,isgrey=isgrey)]#,isshow=check_bsz,ts=50)
+            nv_inbatchv = len(batch_v)
+            data_patch = np.linspace(0,len(batch_v[0]),nseg+1,endpoint=True).astype(np.int16)
+            for bvid,v in enumerate(batch_v):
+                temp_v = []
+                for pid in range(1,len(data_patch)):
+                    fid = rng.choice(range(data_patch[pid-1],data_patch[pid]),1,replace=False)[0]
+                    # if isgrey:
+                    #     data[bid,pid-1] = np.expand_dims(v[fid],axis=-1)
+                    # else:
+                    #     data[bid,pid-1] = v[fid]
+                    temp_v.append(v[fid])
+                temp_v = np.array(temp_v)
+                data.append(temp_v)
+                target.append(self._getLabelId(vid))
         
+        data = np.array(data)
+        print(data.shape)
         if check_bsz:
-            for bid in range(bsz):
+            for bid in range(data.shape[0]):
                 for fid in range(nseg):
                     cv2.imshow("frames_{}".format(bid),data[bid,fid]/255)
                     cv2.waitKey(150)

@@ -11,9 +11,9 @@ config["filelistFi"] = "/opt/Data/sthsthV1/datasplit_label/something-something-v
 
 sthsth_data = sthsth(**config)
 test_config = {}
-test_config["get_video"] = True
+test_config["get_video"] = False
 test_config["_getLabelId"] = False
-test_config["get_batch"] = False
+test_config["get_batch"] = True
 test_config["gen_batch"] = False
 test_config["get_hist_vlength"] = False
 test_config["merge_segchg"] = False
@@ -28,7 +28,14 @@ if test_config["_getLabelId"]:
 
 if test_config["get_batch"]:
     print("test get_batch")
-    sthsth_data.get_batch(bsz=10,wh=[130,100],check_bsz=True)
+    augconf = {}
+    augconf["fwh"] = [100,100]
+    augconf["kratio"] = False
+    augconf["minsz"] = 128
+    augconf["rsize"] = 2.0
+    augconf["ctcrop"] = True
+    augconf["ncrop"] = 4
+    sthsth_data.get_batch(nv=5,wh=[130,100],check_bsz=True,augconf=augconf)
 
 if test_config["gen_batch"]:
     print("test gen_batch")
