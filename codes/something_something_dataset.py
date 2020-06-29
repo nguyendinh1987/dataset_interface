@@ -72,10 +72,11 @@ class sthsth(object):
         v = []
         for fl in frame_list:
             frame = cv2.imread(fl)
-            if isgrey:
-                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
             if wh is not None:
                 frame = cv2.resize(frame,(wh[0],wh[1]))
+            if isgrey:
+                frame = cv2.cvtColor(frame, cv2.COLOR_BGR2GRAY)
+                frame = np.expand_dims(frame,axis=-1)
             v.append(frame)
 
         if isshow:
@@ -126,8 +127,8 @@ class sthsth(object):
     
     def vcrop(self,v,fwh,ctcrop,ncrop):
         batch_v = []
+        hw = v[0].shape[0:2]
         for nc in range(ncrop):
-            hw = v[0].shape[0:-1]
             if ctcrop:
                 hwc = [x/2 for x in hw]
                 hwdis = [fwh[1-i]/2 for i in range(2)]
@@ -149,7 +150,8 @@ class sthsth(object):
         return batch_v
 
     def kratio_crop(self,v,fwh,minsz,ctcrop,ncrop):
-        orgs = [x for x in v[0].shape][0:-1] 
+        c = v[0].shape[2]
+        orgs = [x for x in v[0].shape][0:2]
         shortestd = np.argmin(orgs)# 1 -> w, 0->h
         rs_ratio = minsz/orgs[shortestd]
         
@@ -159,6 +161,8 @@ class sthsth(object):
             newsize = (int(orgs[0]*rs_ratio),minsz) 
         for fid in range(len(v)):
             v[fid] = cv2.resize(v[fid],newsize)
+            if c==1:
+                v[fid] = np.expand_dims(v[fid],axis=-1)
 
         assert newsize[0]>=fwh[1], "target height must be smaller than image height: tgsize: {}; imgsize: {}".format(fwh[1],newsize[0])
         assert newsize[1]>=fwh[0], "target width must be smaller than image width: tgsize: {}; imgsize: {}".format(fwh[0],newsize[1])
@@ -170,14 +174,16 @@ class sthsth(object):
         return self.vcrop(v,fwh,ctcrop,ncrop)
         
     def rratio_crop(self,v,fwh,maxrsize,ctcrop,ncrop):
-        hw = v[0].shape[0:-1]
+        c = v[0].shape[2]
+        hw = v[0].shape[0:2]
         batch_v = []
         for n in range(ncrop):
             rsize = rng.uniform(1.0,maxrsize)
             newsize = [int(hw[i]*rsize) for i in range(2)]
             for fid in range(len(v)):
                 v[fid] = cv2.resize(v[fid],tuple(newsize))
-
+                if c==1:
+                    v[fid] = np.expand_dims(v[fid],axis=-1)
             assert newsize[0]>fwh[1], "target height must be smaller than image height: tgsize: {}; imgsize: {}".format(fwh[1],newsize[0])
             assert newsize[1]>fwh[0], "target width must be smaller than image width: tgsize: {}; imgsize: {}".format(fwh[0],newsize[1])
 
@@ -199,9 +205,9 @@ class sthsth(object):
         else:
             return self.rratio_crop(v,fwh,rsize,ctcrop,ncrop)
         
-    def gen_batch(self,isshuffle=True,merge_sgch=False,**kargs):
+    def gen_batch(self,bsz=10,isshuffle=True,merge_sgch=False,**kargs):
         # print("xxxx")
-        bsz = kargs["bsz"]
+        # bsz = kargs["bsz"]
         filelist = self.files[0].values
         nfiles = filelist.shape[0]
         # print("nfiles: {}; bsz: {}".format(nfiles,bsz))
@@ -215,11 +221,11 @@ class sthsth(object):
                 # print("{} of {}".format(p+1,npatches))
                 internal_bsz = min((p+1)*bsz,nfiles)-p*bsz
                 # print("int_bsz: {}; bsz: {}".format(internal_bsz,bsz))
-                internal_kargs = copy.copy(kargs)
-                internal_kargs["bsz"] = internal_bsz
                 startp = p*bsz
                 endp = startp+internal_bsz
                 vlist = filelist[startp:endp]
+                internal_kargs = copy.copy(kargs)
+                internal_kargs["nv"] = len(vlist)
                 data,target = self.get_batch(vlist=vlist,**internal_kargs)
                 if merge_sgch:
                     data = self.merge_segchg(data)
@@ -246,6 +252,8 @@ class sthsth(object):
         #     data = np.zeros((bsz,nseg,fwh[1],fwh[0],3))
         data = []
         target = []#[0 for i in range(bsz)]
+        if check_bsz:
+            print("Process {} videos of {} videos".format(nv,len(vlist)))
         for bid, vid in enumerate(vlist):
             if bid+1 > nv:
                 break
@@ -269,9 +277,9 @@ class sthsth(object):
                 temp_v = np.array(temp_v)
                 data.append(temp_v)
                 target.append(self._getLabelId(vid))
-        
+        data,target = shuffle(data,target)
         data = np.array(data)
-        print(data.shape)
+        # print(data.shape)
         if check_bsz:
             for bid in range(data.shape[0]):
                 for fid in range(nseg):
