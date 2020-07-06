@@ -5,7 +5,8 @@ from codes.saaagg import saaagg
 
 data_config = {}
 data_config["dataRoot"] = "/opt/Data/SAA_Aggression"
-data_config["mode"] = "all"
+data_config["mode"] = "train"
+data_config["splitFile"] = "/opt/workspace/output/datasplit/outspeclist_train.txt"
 data_config["output"] = "/opt/workspace/output"
 data_config["subVideoFolder"] = "TrainVal_Full"
 saadata = saaagg(**data_config)
@@ -14,8 +15,8 @@ test_opt["getVideoWithSpec"] = False
 test_opt["getVpath"] = False
 test_opt["loadVideo"] = False
 test_opt["loadbatch_for_classification"] = False
-test_opt["genbatch_for_classification"] = False
-test_opt["traintestsplit"] = True
+test_opt["genbatch_for_classification"] = True
+test_opt["traintestsplit"] = False
 
 if test_opt["getVideoWithSpec"]:
     # this combination has 200 samples, could be enough for domain adaptation
@@ -36,12 +37,13 @@ if test_opt["loadbatch_for_classification"]:
 
 if test_opt["genbatch_for_classification"]:
     lbconf={}
-    lbconf["isgrey"]=False
+    lbconf["isgrey"]=True
     lbconf["return_array"]=True
-    lbconf["isshow"]=True
+    lbconf["isshow"]=False
     lbconf["nseg"]=8
-    datagen = saadata.genbatch_for_classification(bts=3,wh=[120,100],lbconf=lbconf)
-    for r in range(10):
+    datagen = saadata.genbatch_for_classification(bts=10,wh=[120,100],lbconf=lbconf)
+    for r in range(175):
+        print(r)
         for data,target in datagen:
             print(data.shape)
             break

@@ -68,7 +68,9 @@ class saaagg(object):
         if filelist is None:
             filelist = self.vList
         nfiles = len(filelist)
-        npatches = np.floor(nfiles/bts).astype(np.int16)+1
+        npatches = np.floor(nfiles/bts).astype(np.int16)
+        if npatches*bts<nfiles:
+            npatches += 1
         print(nfiles)
         print(npatches)
         while True:
