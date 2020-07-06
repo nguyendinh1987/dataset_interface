@@ -264,9 +264,9 @@ class sthsth(object):
             else:
                 batch_v = [self.get_video(vnum=vid,wh=fwh,isgrey=isgrey)]#,isshow=check_bsz,ts=50)
             nv_inbatchv = len(batch_v)
-            data_patch = np.linspace(0,len(batch_v[0]),nseg+1,endpoint=True).astype(np.int16)
             for bvid,v in enumerate(batch_v):
                 temp_v = []
+                data_patch = np.linspace(0,len(batch_v[bvid]),nseg+1,endpoint=True).astype(np.int16)
                 for pid in range(1,len(data_patch)):
                     fid = rng.choice(range(data_patch[pid-1],data_patch[pid]),1,replace=False)[0]
                     # if isgrey:
