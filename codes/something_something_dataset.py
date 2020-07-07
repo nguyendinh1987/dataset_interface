@@ -217,6 +217,7 @@ class sthsth(object):
         # print(npatches)
         
         while True:
+            print(npatches)
             if isshuffle:
                 filelist = shuffle(filelist)
             for p in range(npatches):
