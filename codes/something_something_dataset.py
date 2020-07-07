@@ -211,7 +211,9 @@ class sthsth(object):
         filelist = self.files[0].values
         nfiles = filelist.shape[0]
         # print("nfiles: {}; bsz: {}".format(nfiles,bsz))
-        npatches = np.floor(nfiles/bsz).astype(np.int16)+1
+        npatches = np.floor(nfiles/bsz).astype(np.int16)
+        if npatches*bsz < nfiles:
+            npatches += 1
         # print(npatches)
         
         while True:
