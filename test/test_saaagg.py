@@ -6,7 +6,7 @@ from codes.saaagg import saaagg
 data_config = {}
 data_config["dataRoot"] = "/opt/Data/SAA_Aggression"
 data_config["mode"] = "train"
-data_config["splitFile"] = "/opt/workspace/output/datasplit/outspeclist_train.txt"
+data_config["splitFile"] = "/opt/workspace/output/datasplit/speclist_val.txt"
 data_config["output"] = "/opt/workspace/output"
 data_config["subVideoFolder"] = "TrainVal_Full"
 saadata = saaagg(**data_config)
