@@ -30,6 +30,11 @@ class sthsth(object):
         self._getAllLabels()
         print("Get file list")
         self._getFileList()
+
+        # self.tfgen_opt = False if "tfgen" not in kargs.keys() else kargs["tfgen"]
+        # if self.tfgen_opt:
+        #     from .sthsthtfgenerator import sthsthtfgen as tfgen
+        #     print(tfgen)
     
     ## utis
     def _getAllLabels(self):
@@ -204,8 +209,20 @@ class sthsth(object):
             return self.kratio_crop(v,fwh,minsz,ctcrop,ncrop)
         else:
             return self.rratio_crop(v,fwh,rsize,ctcrop,ncrop)
-        
-    def gen_batch(self,bsz=10,isshuffle=True,merge_sgch=False,**kargs):
+    
+    def gen_batch(self,opt="np",bsz=10,isshuffle=True,merge_sgch=False,**kargs):
+        if opt=="np":
+            return self.gen_batch_np(bsz=bsz,isshuffle=isshuffle,merge_sgch=merge_sgch,**kargs)
+        elif opt=="tf":
+            return self.gen_batch_tf(bsz=bsz,isshuffle=isshuffle,merge_sgch=merge_sgch,**kargs)
+        else:
+            pass
+    def gen_batch_tf(self,bsz=10,isshuffle=True,merge_sgch=False,**kargs):
+        from .sthsthtfgenerator import sthsthtfgen as tfgen
+        tfgenerator = tfgen(self,bts=bsz,isshuffle=isshuffle,merge_sgch=merge_sgch,**kargs)
+        return tfgenerator
+
+    def gen_batch_np(self,bsz=10,isshuffle=True,merge_sgch=False,**kargs):
         # print("xxxx")
         # bsz = kargs["bsz"]
         filelist = self.files[0].values
