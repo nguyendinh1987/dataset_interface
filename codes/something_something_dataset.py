@@ -67,8 +67,7 @@ class sthsth(object):
 
     def get_video(self,vnum = None,wh = None, rootF = "20bn-something-something-v1",isshow=False,ts=15,isgrey=False):
         if vnum is None:
-            # this one is wrong: vnum should be a number referring to video, not index
-            vnum = rng.randint(0,self.files.shape[0])
+            vnum = self.files.iloc[rng.randint(0,self.files.shape[0])][0]
         path_to_video = os.path.join(self.rootFo,rootF,str(vnum))
         frame_list = glob.glob(path_to_video+"/*.jpg")
         frame_nums = [int(fn.split("/")[-1].split(".")[0]) for fn in frame_list]
