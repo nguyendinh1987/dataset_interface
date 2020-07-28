@@ -71,8 +71,8 @@ class saaagg(object):
         npatches = np.floor(nfiles/bts).astype(np.int16)
         if npatches*bts<nfiles:
             npatches += 1
-        print(nfiles)
-        print(npatches)
+        print("number of samples: {}".format(nfiles))
+        print("number of npatches: {}".format(npatches))
         while True:
             if isshuffle:
                 filelist = shuffle(filelist)
@@ -122,7 +122,7 @@ class saaagg(object):
             if "Non" in k:
                 NonAggId = self.classIds[k]
                 break
-        assert NonAggId > 0, "Your class Id setup dont have 'Non'"
+        assert NonAggId > -1, "Your class Id setup dont have 'Non'"
 
         for vid in vids:
             vpath = self.getVpath(vid,vlist)
@@ -178,6 +178,8 @@ class saaagg(object):
         return os.path.join(self.dataSource,self.subVideoFolder)
     def getnclasses(self):
         return len(self.classIds.keys())
+    def getnsamples(self):
+        return len(self.vList)
 
     def loadVideo(self,vpath,wh=None,isgrey=False,isshow=False):
         # vpath should be a full path
@@ -235,6 +237,7 @@ class saaagg(object):
             for l in os.scandir(f.path):
                 subnames = l.path.split("/")
                 self.vList.append(subnames[-2]+"/"+subnames[-1])
+        print("There are {} videos".format(len(self.vList)))
         return self.vList
 
     def getVListWithSpec(self,spec):
@@ -242,4 +245,21 @@ class saaagg(object):
         for sp in spec:
             vlist.extend([self.vList[vid] for vid in range(len(self.vList)) if sp in self.vList[vid]])
         return vlist 
+    def getListWithId(self,Id):
+        assert Id<2, "This dataset only has two classes. Id must be less than 2"
+        NonAggId = -1
+        for k in self.classIds.keys():
+            if "Non" in k:
+                NonAggId = self.classIds[k]
+                break
+        assert NonAggId > -1, "Your class Id setup dont have 'Non'"
+        
+        if Id == NonAggId:
+            vlist = [v for v in self.vList if "Non" in v]
+        else:
+            vlist = [v for v in self.vList if "Non" not in v]
+        
+        return vlist
+
+
         
