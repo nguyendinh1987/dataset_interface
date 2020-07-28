@@ -40,6 +40,7 @@ class sthsthtfgen(Sequence):
         if self.merge_sgch:
             data = self.dataobj.merge_segchg(data)
         # shuffle list when last sample is loaded
-        if idx+1 == self.nbatches and self.shuffle:
-            self.filelist = shuffle(self.shuffle)
+        if idx+1 == self.nbatches and self.isshuffle:
+            print("Doing shuffle data [{}]".format(idx+1))
+            self.filelist = shuffle(self.filelist)
         return (data,target)
