@@ -237,6 +237,7 @@ class saaagg(object):
             for l in os.scandir(f.path):
                 subnames = l.path.split("/")
                 self.vList.append(subnames[-2]+"/"+subnames[-1])
+        print("There are {} videos".format(len(self.vList)))
         return self.vList
 
     def getVListWithSpec(self,spec):

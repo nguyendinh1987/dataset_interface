@@ -6,23 +6,73 @@ from codes.saaagg import saaagg
 data_config = {}
 data_config["dataRoot"] = "/opt/Data/SAA_Aggression"
 data_config["mode"] = "train"
-data_config["splitFile"] = "/opt/workspace/output/datasplit/speclist_val.txt"
+data_config["splitFile"] = "/opt/workspace/output/datasplit/speclist_train.txt"
 data_config["output"] = "/opt/workspace/output"
 data_config["subVideoFolder"] = "TrainVal_Full"
 saadata = saaagg(**data_config)
 test_opt = {}
-test_opt["getVideoWithSpec"] = False
+test_opt["getVideoWithSpec"] = True
 test_opt["getVpath"] = False
 test_opt["loadVideo"] = False
 test_opt["loadbatch_for_classification"] = False
-test_opt["genbatch_for_classification"] = True
+test_opt["genbatch_for_classification"] = False
 test_opt["traintestsplit"] = False
 
 if test_opt["getVideoWithSpec"]:
     # this combination has 200 samples, could be enough for domain adaptation
-    spec = ["NonAgg_20180606","NonAgg_20180604"]
-    vlist = saadata.getVideoWithSpec(spec)
-    print(len(vlist))
+    # spec = ["NonAgg_20180606","NonAgg_20180604"]
+    specs = ["BoxingSpeedBag",
+            "Fencing",
+            "Punch",
+            "Drumming",
+            "HeadMassage",
+            "JumpingJack",
+            "JumpRope",
+            "PullUps",
+            "PushUps",
+            "taichi",
+            "WallPushups",
+            #### Real videos
+            "5_31_2016",
+            "19_3_2018",
+            "20180604",
+            "20180606",
+            "20180703",
+            "a_",
+            "AGT_",
+            "b_",
+            "c_",
+            "e_",
+            "f1_",
+            "f2_",
+            "f3_",
+            "f4_",
+            "f5_",
+            "GeylangMockup",
+            "p1_",
+            "p2_",
+            "p3_",
+            "p4_",
+            "p5_",
+            "p6_",
+            "p7_",
+            "p8_",
+            "p9_",
+            "Tanglin",
+            "vid1",
+            "vid2",
+            "vid3",
+            "vid4",
+            "vid5",
+            "vid6",
+            "vid7",
+            "vid8"]
+    for spec in specs:
+        for act in ["Agg","NonAgg"]:
+            tmp = act+"_"+spec
+            vlist = saadata.getVListWithSpec([tmp])
+            print("{}: {}".format(tmp,len(vlist)))
+        print("==============================")
 
 if test_opt["getVpath"]:
     saadata.getVpath(10)

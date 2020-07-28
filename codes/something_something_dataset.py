@@ -62,6 +62,7 @@ class sthsth(object):
 
     def get_video(self,vnum = None,wh = None, rootF = "20bn-something-something-v1",isshow=False,ts=15,isgrey=False):
         if vnum is None:
+            # this one is wrong: vnum should be a number referring to video, not index
             vnum = rng.randint(0,self.files.shape[0])
         path_to_video = os.path.join(self.rootFo,rootF,str(vnum))
         frame_list = glob.glob(path_to_video+"/*.jpg")
@@ -86,6 +87,19 @@ class sthsth(object):
                 cv2.destroyWindow("v")
         
         return v
+
+    def get_similar_videos_list(self,vidx = None):
+        if vidx is None:
+            return None
+        print(self.files.head(10))
+        vnum = self.files[0][vidx]
+        lid = self._getLabelId(vnum)
+        cldes = self.labels.iloc[lid][0]
+        print(cldes)
+        vindices = self.files[self.files[1]==cldes].index.tolist()
+        vlist = self.files.iloc[vindices][0].tolist()
+        # print(vlist)
+        return vlist
     
     def get_hist_vlength(self,rootF = "20bn-something-something-v1"):
         vl = [0 for i in range(self.files.shape[0])]
@@ -141,7 +155,8 @@ class sthsth(object):
             hwend = [min(hw[i],hwstart[i]+fwh[1-i]) for i in range(2)]
             # print([whstart[i] for i in range(2)])
             # print([whend[i] for i in range(2)])
-            newv = v.copy()
+            # Convert to copy.copy(v) to avoid cv::UMat error
+            newv = copy.copy(v)
             for fid in range(len(v)):
                 # newv[fid] = cv2.rectangle(newv[fid],(hwstart[1],hwstart[0]),(hwend[1],hwend[0]),color=(0,255,0),thickness=3)
                 # newv[fid] = cv2.resize(newv[fid],(fwh[0],fwh[1]))
