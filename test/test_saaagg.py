@@ -3,18 +3,26 @@ import numpy as np
 sys.path.append("/opt/workspace/python/dataset_interface")
 from codes.saaagg import saaagg
 
+# data_config = {}
+# data_config["dataRoot"] = "/opt/Data/SAA_Aggression"
+# data_config["mode"] = "train"
+# data_config["splitFile"] = "/opt/workspace/output/datasplit/speclist_train.txt"
+# data_config["output"] = "/opt/workspace/output"
+# data_config["subVideoFolder"] = "TrainVal_Full"
+
 data_config = {}
-data_config["dataRoot"] = "/opt/Data/SAA_Aggression"
+data_config["dataRoot"] = "/opt/Data/tmp/Set3_saaagg"
+data_config["videoSource"] = "/opt/Data/tmp/Set3_saaagg/Videos"
 data_config["mode"] = "train"
-data_config["splitFile"] = "/opt/workspace/output/datasplit/speclist_train.txt"
-data_config["output"] = "/opt/workspace/output"
-data_config["subVideoFolder"] = "TrainVal_Full"
+data_config["splitFile"] = "/opt/workspace/output/datasplit/set3list_train.txt"
+data_config["output"] = "/opt/workspace/output/tmpdata"
+
 saadata = saaagg(**data_config)
 test_opt = {}
-test_opt["getVideoWithSpec"] = True
+test_opt["getVideoWithSpec"] = False
 test_opt["getVpath"] = False
 test_opt["loadVideo"] = False
-test_opt["loadbatch_for_classification"] = False
+test_opt["loadbatch_for_classification"] = True
 test_opt["genbatch_for_classification"] = False
 test_opt["traintestsplit"] = False
 
@@ -83,7 +91,7 @@ if test_opt["loadVideo"]:
     V = saadata.loadVideo(vpath,isshow=True)
 
 if test_opt["loadbatch_for_classification"]:
-    saadata.loadbatch_for_classification(isgrey=False,isshow=True)
+    saadata.loadbatch_for_classification(isgrey=False,isshow=True,nseg=8)
 
 if test_opt["genbatch_for_classification"]:
     lbconf={}
@@ -94,9 +102,13 @@ if test_opt["genbatch_for_classification"]:
     datagen = saadata.genbatch_for_classification(bts=10,wh=[120,100],lbconf=lbconf)
     for r in range(175):
         print(r)
-        for data,target in datagen:
-            print(data.shape)
-            break
+        d,t = next(datagen)
+        print(d.shape)
+        print(t)
+        # for data,target in datagen:
+        #     print(data.shape)
+        #     print(target)
+        #     break
 if test_opt["traintestsplit"]:
     vtrain,vtest = saadata.traintestsplit(savetofiles=["/opt/workspace/output/train0.txt","/opt/workspace/output/val0.txt"])
     print(len(vtrain))

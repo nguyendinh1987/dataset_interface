@@ -35,6 +35,8 @@ class sthsth(object):
         # if self.tfgen_opt:
         #     from .sthsthtfgenerator import sthsthtfgen as tfgen
         #     print(tfgen)
+
+        self.print_ctcrop_warning = True
     
     ## utis
     def _getAllLabels(self):
@@ -64,6 +66,15 @@ class sthsth(object):
     ## interface with data
     def get_nclasses(self):
         return self.labels.shape[0]
+    def get_labels(self):
+        return self.labels[0].tolist()
+    def get_nvideos_per_label(self,l=None):
+        if l is None:
+            return None
+        else:
+            vindices = self.files[self.files[1]==l].index.tolist()
+            vlist = self.files.iloc[vindices][0].tolist()
+            return len(vlist),vlist
 
     def get_video(self,vnum = None,wh = None, rootF = "20bn-something-something-v1",isshow=False,ts=15,isgrey=False):
         if vnum is None:
@@ -187,7 +198,11 @@ class sthsth(object):
         assert newsize[1]>=fwh[0], "target width must be smaller than image width: tgsize: {}; imgsize: {}".format(fwh[0],newsize[1])
 
         if ctcrop:
-            print("set ctcrop to False for multiple cropping processes")
+            if self.print_ctcrop_warning:
+                print("***************************************************")
+                print("set ctcrop to False for multiple cropping processes")
+                print("***************************************************")
+                self.print_ctcrop_warning = False
             ncrop = 1
         
         return self.vcrop(v,fwh,ctcrop,ncrop)

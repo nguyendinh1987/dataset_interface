@@ -2,6 +2,7 @@ import os, sys
 import numpy as np
 sys.path.append("/opt/workspace/python/dataset_interface")
 from codes.something_something_dataset import sthsth
+import cv2
 
 config = {}
 config["rootF"] = "/opt/Data/sthsthV1"
@@ -11,7 +12,7 @@ config["filelistFi"] = "/opt/Data/sthsthV1/datasplit_label/something-something-v
 
 sthsth_data = sthsth(**config)
 test_config = {}
-test_config["get_video"] = False
+test_config["get_video"] = True
 test_config["_getLabelId"] = False
 test_config["get_batch"] = False
 test_config["gen_batch"] = False
@@ -20,7 +21,9 @@ test_config["merge_segchg"] = False
 
 if test_config["get_video"]:
     print("Test get_video")
-    v = sthsth_data.get_video(vnum=17,isshow=True,ts=150,isgrey=True)
+    v = sthsth_data.get_video(vnum=17,isshow=True,ts=10,isgrey=True)
+    for fid,f in enumerate(v):
+        cv2.imwrite("/opt/workspace/output/tmpdata/{}.jpg".format(fid),f)
 
 if test_config["_getLabelId"]:
     print("test _getLabelId")

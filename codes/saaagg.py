@@ -117,19 +117,23 @@ class saaagg(object):
 
         videos = []
         targets = []
-        NonAggId = -1
-        for k in self.classIds.keys():
-            if "Non" in k:
-                NonAggId = self.classIds[k]
-                break
-        assert NonAggId > -1, "Your class Id setup dont have 'Non'"
+        # NonAggId = -1
+        # for k in self.classIds.keys():
+        #     if "Non" in k:
+        #         NonAggId = self.classIds[k]
+        #         break
+        # assert NonAggId > -1, "Your class Id setup dont have 'Non'"
 
         for vid in vids:
             vpath = self.getVpath(vid,vlist)
-            if "NonAgg" in vpath:
-                targets.append(NonAggId)
-            else:
-                targets.append(1-NonAggId)
+            for k in self.classIds.keys():
+                if k in vpath:
+                    targets.append(self.classIds[k])
+                    break
+            # if "NonAgg" in vpath:
+            #     targets.append(NonAggId)
+            # else:
+            #     targets.append(1-NonAggId)
             org_v = self.loadVideo(vpath,wh=wh,isgrey=isgrey)
             data_patch = np.linspace(0,len(org_v),nseg+1,endpoint=True).astype(np.int16)
             seg_v = []
@@ -142,10 +146,12 @@ class saaagg(object):
             videos,targets = shuffle(videos,targets)
         
         if isshow:
+            print(len(videos))
             for vid, v in enumerate(videos):
+                print(vid)
                 for fr in v:
                     cv2.imshow("{}".format(targets[vid]),fr)
-                    cv2.waitKey(25)
+                    cv2.waitKey(250)
                 cv2.destroyAllWindows()
 
         if return_array:
@@ -247,17 +253,24 @@ class saaagg(object):
         return vlist 
     def getListWithId(self,Id):
         assert Id<2, "This dataset only has two classes. Id must be less than 2"
-        NonAggId = -1
-        for k in self.classIds.keys():
-            if "Non" in k:
-                NonAggId = self.classIds[k]
+        # NonAggId = -1
+        # for k in self.classIds.keys():
+        #     if "Non" in k:
+        #         NonAggId = self.classIds[k]
+        #         break
+        # assert NonAggId > -1, "Your class Id setup dont have 'Non'"
+        label = None
+        for k,v in self.ClassIds.items():
+            if Id==v:
+                label = k
                 break
-        assert NonAggId > -1, "Your class Id setup dont have 'Non'"
-        
-        if Id == NonAggId:
-            vlist = [v for v in self.vList if "Non" in v]
-        else:
-            vlist = [v for v in self.vList if "Non" not in v]
+        assert label is not None
+
+        # if Id == NonAggId:
+        #     vlist = [v for v in self.vList if "Non" in v]
+        # else:
+        #     vlist = [v for v in self.vList if "Non" not in v]
+        vlist = [v for v in self.vList if label in v]
         
         return vlist
 
