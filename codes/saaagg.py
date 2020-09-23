@@ -64,7 +64,12 @@ class saaagg(object):
     #     return self.classIds[self.vList[fid].split["/"][0]]
     ##############################################
     ##############################################
-    def genbatch_for_classification(self,filelist=None,wh=None,bts=10,isshuffle=True,lbconf={}):
+    def genbatch_for_classification(self,filelist=None,wh=None,
+                                    bts=10,
+                                    isshuffle=True,
+                                    join_ch_seg=True,
+                                    returnvlist=False,
+                                    lbconf={}):
         if filelist is None:
             filelist = self.vList
         nfiles = len(filelist)
@@ -88,10 +93,14 @@ class saaagg(object):
                 internal_kargs["vlist"]=vlist
                 internal_kargs["isshuffle"]=False
                 data,target = self.loadbatch_for_classification(**internal_kargs)
-                bsz,sg,h,w,c = data.shape
-                data = np.transpose(data,(0,2,3,4,1)).reshape((bsz,h,w,sg*c))
+                if join_ch_seg:
+                    bsz,sg,h,w,c = data.shape
+                    data = np.transpose(data,(0,2,3,4,1)).reshape((bsz,h,w,sg*c))
                 del internal_kargs
-                yield (data,target)
+                if returnvlist:
+                    yield (data,target,vlist)
+                else:
+                    yield (data,target)
         
     def loadbatch_for_classification(self,vids=None,wh=None,
                                           bts=10,
@@ -260,7 +269,7 @@ class saaagg(object):
         #         break
         # assert NonAggId > -1, "Your class Id setup dont have 'Non'"
         label = None
-        for k,v in self.ClassIds.items():
+        for k,v in self.classIds.items():
             if Id==v:
                 label = k
                 break
