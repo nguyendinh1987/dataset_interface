@@ -234,6 +234,11 @@ class sthsth(object):
                 v[fid] = np.expand_dims(v[fid],axis=-1)
         
         if ctcrop:
+            if self.print_ctcrop_warning:
+                print("***************************************************")
+                print("set ctcrop to False for multiple cropping processes")
+                print("***************************************************")
+                self.print_ctcrop_warning = False
             ncrop = 1
 
         return self.vcrop(v,fwh,ctcrop,ncrop)

@@ -12,7 +12,7 @@ config["filelistFi"] = "/opt/Data/sthsthV1/datasplit_label/something-something-v
 
 sthsth_data = sthsth(**config)
 test_config = {}
-test_config["get_video"] = True
+test_config["get_video"] = False
 test_config["_getLabelId"] = False
 test_config["_getLabelDes"] = False
 test_config["get_batch"] = True
