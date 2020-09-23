@@ -38,7 +38,7 @@ class lfw_face(object):
         if self.verbose:
             nc = [len(l) for l in self.faceList]
             n = np.sum(np.array(nc))
-            print("There are {} images for {} identified faces".format(n,self.nFocusClasses))
+            print("There are {} full face images for {} identified faces".format(n,self.nFocusClasses))
         
         self.maskedFaceRootFo = None if "maskedface" not in kargs.keys() else kargs["maskedface"]
         if self.maskedFaceRootFo is not None:
@@ -48,7 +48,7 @@ class lfw_face(object):
             if self.verbose:
                 nc = [len(l) for l in self.maskfaceList]
                 n = np.sum(np.array(nc))
-                print("There are {} images for {} identified faces".format(n,self.nFocusClasses))
+                print("There are {} masked face images for {} identified faces".format(n,self.nFocusClasses))
         else:
             self.maskfaceList = None
     #####
