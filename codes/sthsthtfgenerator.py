@@ -12,7 +12,7 @@ import sys
 from tensorflow.python.keras.utils.data_utils import Sequence
 
 class sthsthtfgen(Sequence):
-    def __init__(self,dataobj,bts=10,isshuffle=False,merge_sgch=False,**kargs):
+    def __init__(self,dataobj,bts=10,isshuffle=False,merge_sgch=False,n=1,**kargs):
         self.dataobj = dataobj
         self.filelist = dataobj.files[0].values
         self.nfiles = len(self.filelist)
@@ -20,12 +20,13 @@ class sthsthtfgen(Sequence):
         self.isshuffle = isshuffle
         self.merge_sgch = merge_sgch
         self.nbatches = int(np.ceil(self.nfiles/float(self.bts)))
+        self.nbatches_train = int(np.floor(self.nbatches/n))
         self.kargs = kargs
         print("batch_size: {}".format(self.bts))
         print("number of batches: {}".format(self.nbatches))
     
     def __len__(self):
-        return self.nbatches #np.ceil(len(self.filelist)/float(self.bts)).astype(np.int16)
+        return self.nbatches_train #np.ceil(len(self.filelist)/float(self.bts)).astype(np.int16)
     
     def __getitem__(self,idx):
         # print("{} of {}".format(p+1,npatches))

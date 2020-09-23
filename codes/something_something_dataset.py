@@ -40,9 +40,10 @@ class sthsth(object):
     
     ## utis
     def _getAllLabels(self):
-        self.labels = pd.read_csv(self.labelFi,usecols=[0,1],header=None)
+        self.labels = pd.read_csv(self.labelFi,usecols=[0,1],header=None).fillna(" ")
         if self.verbose:
             print("There are {} actions".format(self.labels.shape[0]))
+            print(self.labels.head(5))
             # print(self.labels.iloc[0][0])
             # print(self.labels[self.labels[0]=="Folding something"].index.tolist()[0])
             # to get label description: use self.labels.iloc[id][0]
@@ -50,18 +51,25 @@ class sthsth(object):
         return True
     
     def _getFileList(self):
-        self.files = pd.read_csv(self.filelistFi,header=None)
+        self.files = pd.read_csv(self.filelistFi,header=None).fillna(" ")
         if self.verbose:
             print("There are {} files".format(self.files.shape[0]))
+            print(self.files.head(50))
         return True
 
     def _getLabelId(self,vnum):
         findex = self.files[self.files[0]==vnum].index.tolist()[0]
-        fdes = self.files.iloc[findex][1]
-        lid = self.labels[self.labels[0]==fdes].index.tolist()[0]
+        fdes = self.files.iloc[findex][1:3]
+        # print((self.labels[0]==fdes[1]) & (self.labels[1]==fdes[2]))
+        # print(self.labels[0]==fdes[0])
+        lid = self.labels[(self.labels[0]==fdes[1]) & (self.labels[1]==fdes[2])].index.tolist()[0]
         # if self.verbose:
         #     print("vnum: {}; lid: {}; des: {}".format(vnum,lid,fdes))
         return lid
+
+    def _getLabelDes(self,lId):
+        ldes = self.labels.iloc[lId][0]+"_"+self.labels.iloc[lId][1]
+        return ldes
     
     ## interface with data
     def get_nclasses(self):
@@ -109,9 +117,10 @@ class sthsth(object):
         print(self.files.head(10))
         vnum = self.files[0][vidx]
         lid = self._getLabelId(vnum)
-        cldes = self.labels.iloc[lid][0]
+        cldes = self.labels.iloc[lid][0:2]
         print(cldes)
-        vindices = self.files[self.files[1]==cldes].index.tolist()
+        print(lid)
+        vindices = self.files[(self.files[1]==cldes[0]) & (self.files[2]==cldes[1])].index.tolist()
         vlist = self.files.iloc[vindices][0].tolist()
         # print(vlist)
         return vlist
@@ -189,13 +198,14 @@ class sthsth(object):
             newsize = (minsz,int(orgs[1]*rs_ratio)) 
         else:
             newsize = (int(orgs[0]*rs_ratio),minsz) 
+
+        assert newsize[0]>=fwh[1], "target height must be smaller than image height: tgsize: {}; imgsize: {}".format(fwh[1],newsize[0])
+        assert newsize[1]>=fwh[0], "target width must be smaller than image width: tgsize: {}; imgsize: {}".format(fwh[0],newsize[1])
+
         for fid in range(len(v)):
             v[fid] = cv2.resize(v[fid],newsize)
             if c==1:
                 v[fid] = np.expand_dims(v[fid],axis=-1)
-
-        assert newsize[0]>=fwh[1], "target height must be smaller than image height: tgsize: {}; imgsize: {}".format(fwh[1],newsize[0])
-        assert newsize[1]>=fwh[0], "target width must be smaller than image width: tgsize: {}; imgsize: {}".format(fwh[0],newsize[1])
 
         if ctcrop:
             if self.print_ctcrop_warning:
@@ -210,22 +220,25 @@ class sthsth(object):
     def rratio_crop(self,v,fwh,maxrsize,ctcrop,ncrop):
         c = v[0].shape[2]
         hw = v[0].shape[0:2]
-        batch_v = []
-        for n in range(ncrop):
-            rsize = rng.uniform(1.0,maxrsize)
-            newsize = [int(hw[i]*rsize) for i in range(2)]
-            for fid in range(len(v)):
-                v[fid] = cv2.resize(v[fid],tuple(newsize))
-                if c==1:
-                    v[fid] = np.expand_dims(v[fid],axis=-1)
-            assert newsize[0]>fwh[1], "target height must be smaller than image height: tgsize: {}; imgsize: {}".format(fwh[1],newsize[0])
-            assert newsize[1]>fwh[0], "target width must be smaller than image width: tgsize: {}; imgsize: {}".format(fwh[0],newsize[1])
 
-            tmp_b = self.vcrop(v,fwh,ctcrop,1)[0]
-            batch_v.append(tmp_b)
+        # batch_v = []
+        # for n in range(ncrop):
+        rsize = rng.uniform(1.0,maxrsize)
+        newsize = [int(hw[i]*rsize) for i in range(2)]
+        assert newsize[0]>fwh[1], "target height must be smaller than image height: tgsize: {}; imgsize: {}".format(fwh[1],newsize[0])
+        assert newsize[1]>fwh[0], "target width must be smaller than image width: tgsize: {}; imgsize: {}".format(fwh[0],newsize[1])        
+        
+        for fid in range(len(v)):
+            v[fid] = cv2.resize(v[fid],tuple(newsize))
+            if c==1:
+                v[fid] = np.expand_dims(v[fid],axis=-1)
+        
+        if ctcrop:
+            ncrop = 1
 
-        return batch_v
-    def video_augs(self,v,fwh,kratio,minsz,rsize,ctcrop,ncrop):
+        return self.vcrop(v,fwh,ctcrop,ncrop)
+
+    def video_augs(self,v,fwh,kratio,minsz,rsize,ctcrop,ncrop,flipf=False):
         '''
         fwh: final size of augmented frames
         kratio; [True,False] keep original ratio or not
@@ -233,17 +246,28 @@ class sthsth(object):
         rsize; It is rateresize. if kratio == False, frames are resized randomly with ratio from 1 to rsize
         ctcrop: if it is True, only provide center crop, otherwise it will provide random crop
         ncrop: a number of crop
+        #########################################################################################################
+        if you want to use flipf, please take care videos relating to move sth from left to right and vise versa
+        #########################################################################################################
         '''
         if kratio:
-            return self.kratio_crop(v,fwh,minsz,ctcrop,ncrop)
+            v = self.kratio_crop(v,fwh,minsz,ctcrop,ncrop)
         else:
-            return self.rratio_crop(v,fwh,rsize,ctcrop,ncrop)
-    
-    def gen_batch(self,opt="np",bsz=10,isshuffle=True,merge_sgch=False,**kargs):
+            v = self.rratio_crop(v,fwh,rsize,ctcrop,ncrop)
+        
+        if flipf:
+            print("Doing flipping")
+            gotoprocess = np.random.randint(2)==1
+            if gotoprocess:
+                for fid in range(len(v)):
+                    v[fid] = np.flip(v[fid],1)
+        return v
+        
+    def gen_batch(self,opt="np",bsz=10,isshuffle=True,merge_sgch=False,n=1,**kargs):
         if opt=="np":
             return self.gen_batch_np(bsz=bsz,isshuffle=isshuffle,merge_sgch=merge_sgch,**kargs)
         elif opt=="tf":
-            return self.gen_batch_tf(bsz=bsz,isshuffle=isshuffle,merge_sgch=merge_sgch,**kargs)
+            return self.gen_batch_tf(bsz=bsz,isshuffle=isshuffle,merge_sgch=merge_sgch,n=n,**kargs)
         else:
             pass
     def gen_batch_tf(self,bsz=10,isshuffle=True,merge_sgch=False,**kargs):
@@ -251,7 +275,7 @@ class sthsth(object):
         tfgenerator = tfgen(self,bts=bsz,isshuffle=isshuffle,merge_sgch=merge_sgch,**kargs)
         return tfgenerator
 
-    def gen_batch_np(self,bsz=10,isshuffle=True,merge_sgch=False,**kargs):
+    def gen_batch_np(self,bsz=10,isshuffle=True,merge_sgch=False,n=None,**kargs):
         # print("xxxx")
         # bsz = kargs["bsz"]
         filelist = self.files[0].values
@@ -282,10 +306,13 @@ class sthsth(object):
                 # print("end gen_batch")
                 yield (data,target)
 
-    def get_batch(self,vlist = None, nv = 1, nseg=8, wh = None, isgrey=False, augconf = None, check_bsz = False):
+    def get_batch(self,vlist = None, nv = 1, nseg=8, wh = None, isgrey=False, augconf = None, check_bsz = False,ts=150):
         if vlist is None:
             fcids = rng.choice(self.files.shape[0],nv,replace=False)
             vlist = self.files[0][fcids]
+            if check_bsz:
+                print("Selected ids: {}".format(fcids))
+                _ = input("Press any key to ctnue")
         else:
             assert len(vlist)>=nv, "number of videos in vlist should be larger than batch size (bsz)"
         # print(vlist)
@@ -301,8 +328,7 @@ class sthsth(object):
         #     data = np.zeros((bsz,nseg,fwh[1],fwh[0],3))
         data = []
         target = []#[0 for i in range(bsz)]
-        if check_bsz:
-            print("Process {} videos of {} videos".format(nv,len(vlist)))
+
         for bid, vid in enumerate(vlist):
             if bid+1 > nv:
                 break
@@ -331,10 +357,13 @@ class sthsth(object):
         # print(data.shape)
         if check_bsz:
             for bid in range(data.shape[0]):
+                vname = self._getLabelDes(target[bid])
+                print("{}: {}".format(target[bid],vname))
+                _ = input("press any key to continue")
                 for fid in range(nseg):
-                    cv2.imshow("frames_{}".format(bid),data[bid,fid]/255)
-                    cv2.waitKey(150)
-                cv2.destroyWindow("frames_{}".format(bid))
+                    cv2.imshow("frames_{}".format(vname),data[bid,fid]/255)
+                    cv2.waitKey(ts)
+                cv2.destroyWindow("frames_{}".format(vname))
         # print("end get_batch")
         return data, target
 # class lfw_face(object):
