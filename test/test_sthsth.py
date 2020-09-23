@@ -7,16 +7,19 @@ config = {}
 config["rootF"] = "/opt/Data/sthsthV1"
 config["mode"] = "train"
 config["alllabels_file"] = "/opt/Data/sthsthV1/datasplit_label/something-something-v1-labels.csv"
-config["filelistFi"] = "/opt/Data/sthsthV1/datasplit_label/something-something-v1-train.csv"
+config["filelistFi"] = "/opt/Data/sthsthV1/datasplit_label/something-something-v1-validation.csv"
 
 sthsth_data = sthsth(**config)
 test_config = {}
 test_config["get_video"] = False
 test_config["_getLabelId"] = False
-test_config["get_batch"] = False
-test_config["gen_batch"] = False
+test_config["_getLabelDes"] = False
+test_config["get_batch"] = True
+test_config["gen_batch_np"] = False
+test_config["gen_batch_tf"] = False
 test_config["get_hist_vlength"] = False
 test_config["merge_segchg"] = False
+test_config["get_similar_videos"] = False
 
 if test_config["get_video"]:
     print("Test get_video")
@@ -24,28 +27,43 @@ if test_config["get_video"]:
 
 if test_config["_getLabelId"]:
     print("test _getLabelId")
-    lid = sthsth_data._getLabelId(vnum=11778)
+    lid = sthsth_data._getLabelId(vnum=74927)
+    print(lid)
+
+if test_config["_getLabelDes"]:
+    print("test _getLabelDes")
+    ldes = sthsth_data._getLabelDes(lId = 0)
+    print(ldes)
 
 if test_config["get_batch"]:
     print("test get_batch")
     augconf = {}
     augconf["fwh"] = [100,100]
-    augconf["kratio"] = False
-    augconf["minsz"] = 128
+    augconf["kratio"] = True
+    augconf["minsz"] = 101
     augconf["rsize"] = 2.0
-    augconf["ctcrop"] = True
-    augconf["ncrop"] = 4
-    sthsth_data.get_batch(nv=5,wh=[130,100],check_bsz=True,augconf=augconf)
+    augconf["ctcrop"] = False
+    augconf["ncrop"] = 1
+    augconf["flipf"] = True
+    sthsth_data.get_batch(nv=5,wh=[100,100],check_bsz=True,augconf=augconf)
 
-if test_config["gen_batch"]:
-    print("test gen_batch")
-    batch_gen = sthsth_data.gen_batch(isshuffle=True,bsz=5,wh=[130,100],check_bsz=True)
+if test_config["gen_batch_np"]:
+    print("test gen_batch_np")
+    batch_gen = sthsth_data.gen_batch(opt="np",isshuffle=True,bsz=5,wh=[130,100],check_bsz=True,ts=1000)
     for _ in range(5):
         print("start gen batch")
-        for a in batch_gen:
-            print("data shape")
-            print(a[0].shape)
-            break
+        d,t = next(batch_gen)
+        print(d.shape)
+        print(t)
+
+if test_config["gen_batch_tf"]:
+    print("test gen_batch_tf")
+    batch_gen = sthsth_data.gen_batch(opt="tf",isshuffle=True,bsz=5,wh=[130,100],check_bsz=True,ts=1000)
+    for idx in range(5):
+        print("start gen batch")
+        d,t = batch_gen.__getitem__(idx)
+        print(d.shape)
+        print(t)
 
 if test_config["get_hist_vlength"]:
     print("test get_hist_vlength")
@@ -57,4 +75,8 @@ if test_config["merge_segchg"]:
     data,_ = sthsth_data.get_batch(bsz=10,wh=[130,100],check_bsz=True,isgrey=True)
     print(("Merging dimension ...."))
     data = sthsth_data.merge_segchg(data,do_check=True)
+
+if test_config["get_similar_videos"]:
+    vlist = sthsth_data.get_similar_videos_list(vidx = 1)
+    print(vlist)
 
