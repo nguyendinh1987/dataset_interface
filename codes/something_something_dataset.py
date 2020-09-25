@@ -197,11 +197,29 @@ class sthsth(object):
 
         return vs
 
-    def do_crop(self,v,adjratio,ctcrop,ncrop):
+    def do_crop(self,v,intraratio=0.85,
+                       keepratio=True,
+                       change_intraratio=False,
+                       ctcrop=False,
+                       ncrop=1):
         c = v[0].shape[2]
         orgs = v[0].shape[0:2]
 
-        newhw = [int(adjratio*orgs[0]),int(adjratio*orgs[1])]        
+        if change_intraratio:
+            if self.verbose:
+                print("old intraratio: {}".format(intraratio))
+
+            intraratio = rng.uniform(intraratio,0.98)
+            
+            if self.verbose:
+                print("new intraratio: {}".format(intraratio))
+
+        if keepratio:
+            newhw = [int(intraratio*orgs[0]),int(intraratio*orgs[1])]
+        else:
+            newh = rng.randint(int(intraratio*orgs[0]),orgs[0])
+            neww = rng.randint(int(intraratio*orgs[1]),orgs[1])
+            newhw = [newh,neww]
 
         if ctcrop:
             if self.print_ctcrop_warning:
@@ -215,7 +233,7 @@ class sthsth(object):
 
         return vs
 
-    def video_augs(self,v,fwh,intraratio,ctcrop,ncrop,vscale=None,flipf=False):
+    def video_augs(self,v,fwh,vscale=None,flipf=False,**kargs):#,intraratio,ctcrop,ncrop,change_intraratio=False,keepratio=True):
         '''
         fwh: final size of augmented frames
         kratio; [True,False] keep original ratio or not
@@ -235,7 +253,7 @@ class sthsth(object):
             for fid in range(len(v)):
                 v[fid] = cv2.resize(v[fid],tuple(newsize))
 
-        vs = self.do_crop(v,intraratio,ctcrop,ncrop)
+        vs = self.do_crop(v,**kargs)#,intraratio,keepratio,change_intraratio,ctcrop,ncrop)
         
         for vid in range(len(vs)):
             doflipf = flipf and np.random.randint(2)==1

@@ -9,6 +9,7 @@ config["rootF"] = "/opt/Data/sthsthV1"
 config["mode"] = "train"
 config["alllabels_file"] = "/opt/Data/sthsthV1/datasplit_label/something-something-v1-labels.csv"
 config["filelistFi"] = "/opt/Data/sthsthV1/datasplit_label/something-something-v1-validation.csv"
+config["verbose"] = True
 
 sthsth_data = sthsth(**config)
 test_config = {}
@@ -43,6 +44,8 @@ if test_config["get_batch"]:
     augconf = {}
     augconf["fwh"] = [100,100]
     augconf["intraratio"] = 0.85
+    augconf["keepratio"] = False
+    augconf["change_intraratio"]=True
     augconf["ctcrop"] = False
     augconf["ncrop"] = 5
     augconf["vscale"] = [0.7,1.5]
@@ -51,13 +54,14 @@ if test_config["get_batch"]:
 if test_config["gen_batch_np"]:
     print("test gen_batch_np")
     augconf = {}
-    augconf = {}
     augconf["fwh"] = [100,100]
     augconf["intraratio"] = 0.85
+    augconf["keepratio"] = False
+    augconf["change_intraratio"]=True
     augconf["ctcrop"] = False
     augconf["ncrop"] = 5
     augconf["vscale"] = [0.7,1.5]
-    batch_gen = sthsth_data.gen_batch(opt="np",isshuffle=True,bsz=3,wh=[130,100],check_bsz=True,ts=1000)#,augconf=augconf)
+    batch_gen = sthsth_data.gen_batch(opt="np",isshuffle=True,bsz=3,wh=[130,100],check_bsz=True,ts=1000,augconf=augconf)
     for _ in range(5):
         print("start gen batch")
         d,t = next(batch_gen)
@@ -69,6 +73,8 @@ if test_config["gen_batch_tf"]:
     augconf = {}
     augconf["fwh"] = [100,100]
     augconf["intraratio"] = 0.85
+    augconf["keepratio"] = False
+    augconf["change_intraratio"]=True
     augconf["ctcrop"] = False
     augconf["ncrop"] = 5
     augconf["vscale"] = [0.7,1.5]
