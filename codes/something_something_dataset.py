@@ -163,49 +163,45 @@ class sthsth(object):
                 cv2.destroyWindow("frames_{}".format(bid))
         return data
     
-    def vcrop(self,v,fwh,ctcrop,ncrop):
-        batch_v = []
+    def vcrop(self,v,newhw,ctcrop,ncrop):
         hw = v[0].shape[0:2]
+
+        assert hw[0] >= newhw[0]
+        assert hw[1] >= newhw[1]
+        vs = []
         for nc in range(ncrop):
             if ctcrop:
                 hwc = [x/2 for x in hw]
-                hwdis = [fwh[1-i]/2 for i in range(2)]
-                hwstart = [max(0,int(hwc[i]-hwdis[1-i])) for i in range(2)]
+                hwdis = [newhw[i]/2 for i in range(2)]
+                hwstart = [max(0,int(hwc[i]-hwdis[i])) for i in range(2)]
             else:
                 hwstart = [0,0]
-                hwstart[0] = rng.choice(hw[0]-fwh[1],1,replace=False)[0]
-                hwstart[1] = rng.choice(hw[1]-fwh[0],1,replace=False)[0]
+                if hw[0]-newhw[0]>0:
+                    hwstart[0] = rng.choice(hw[0]-newhw[0],1,replace=False)[0]
+                if hw[1]-newhw[1]>0:
+                    hwstart[1] = rng.choice(hw[1]-newhw[1],1,replace=False)[0]
 
-            hwend = [min(hw[i],hwstart[i]+fwh[1-i]) for i in range(2)]
-            # print([whstart[i] for i in range(2)])
-            # print([whend[i] for i in range(2)])
-            # Convert to copy.copy(v) to avoid cv::UMat error
+            hwend = [min(hw[i],hwstart[i]+newhw[i]) for i in range(2)]
+            
+            # print("orginal hw: {}".format(hw))
+            # print("new hw: {}".format(newhw))
+            # print("hw start: {}".format(hwstart))
+            # print("hw end: {}".format(hwend))
+            
             newv = copy.copy(v)
-            for fid in range(len(v)):
+            for fid in range(len(newv)):
                 # newv[fid] = cv2.rectangle(newv[fid],(hwstart[1],hwstart[0]),(hwend[1],hwend[0]),color=(0,255,0),thickness=3)
-                # newv[fid] = cv2.resize(newv[fid],(fwh[0],fwh[1]))
+                # newv[fid] = cv2.resize(newv[fid],(newsize[0],newsize[1]))
                 newv[fid] = newv[fid][hwstart[0]:hwend[0],hwstart[1]:hwend[1]]
-            batch_v.append(newv)
-        return batch_v
+            vs.append(newv)
 
-    def kratio_crop(self,v,fwh,minsz,ctcrop,ncrop):
+        return vs
+
+    def do_crop(self,v,adjratio,ctcrop,ncrop):
         c = v[0].shape[2]
-        orgs = [x for x in v[0].shape][0:2]
-        shortestd = np.argmin(orgs)# 1 -> w, 0->h
-        rs_ratio = minsz/orgs[shortestd]
-        
-        if shortestd == 0:
-            newsize = (minsz,int(orgs[1]*rs_ratio)) 
-        else:
-            newsize = (int(orgs[0]*rs_ratio),minsz) 
+        orgs = v[0].shape[0:2]
 
-        assert newsize[0]>=fwh[1], "target height must be smaller than image height: tgsize: {}; imgsize: {}".format(fwh[1],newsize[0])
-        assert newsize[1]>=fwh[0], "target width must be smaller than image width: tgsize: {}; imgsize: {}".format(fwh[0],newsize[1])
-
-        for fid in range(len(v)):
-            v[fid] = cv2.resize(v[fid],newsize)
-            if c==1:
-                v[fid] = np.expand_dims(v[fid],axis=-1)
+        newhw = [int(adjratio*orgs[0]),int(adjratio*orgs[1])]        
 
         if ctcrop:
             if self.print_ctcrop_warning:
@@ -215,35 +211,11 @@ class sthsth(object):
                 self.print_ctcrop_warning = False
             ncrop = 1
         
-        return self.vcrop(v,fwh,ctcrop,ncrop)
-        
-    def rratio_crop(self,v,fwh,maxrsize,ctcrop,ncrop):
-        c = v[0].shape[2]
-        hw = v[0].shape[0:2]
+        vs = self.vcrop(v,newhw,ctcrop,ncrop)
 
-        # batch_v = []
-        # for n in range(ncrop):
-        rsize = rng.uniform(1.0,maxrsize)
-        newsize = [int(hw[i]*rsize) for i in range(2)]
-        assert newsize[0]>fwh[1], "target height must be smaller than image height: tgsize: {}; imgsize: {}".format(fwh[1],newsize[0])
-        assert newsize[1]>fwh[0], "target width must be smaller than image width: tgsize: {}; imgsize: {}".format(fwh[0],newsize[1])        
-        
-        for fid in range(len(v)):
-            v[fid] = cv2.resize(v[fid],tuple(newsize))
-            if c==1:
-                v[fid] = np.expand_dims(v[fid],axis=-1)
-        
-        if ctcrop:
-            if self.print_ctcrop_warning:
-                print("***************************************************")
-                print("set ctcrop to False for multiple cropping processes")
-                print("***************************************************")
-                self.print_ctcrop_warning = False
-            ncrop = 1
+        return vs
 
-        return self.vcrop(v,fwh,ctcrop,ncrop)
-
-    def video_augs(self,v,fwh,kratio,minsz,rsize,ctcrop,ncrop,flipf=False):
+    def video_augs(self,v,fwh,intraratio,ctcrop,ncrop,vscale=None,flipf=False):
         '''
         fwh: final size of augmented frames
         kratio; [True,False] keep original ratio or not
@@ -255,18 +227,26 @@ class sthsth(object):
         if you want to use flipf, please take care videos relating to move sth from left to right and vise versa
         #########################################################################################################
         '''
-        if kratio:
-            v = self.kratio_crop(v,fwh,minsz,ctcrop,ncrop)
-        else:
-            v = self.rratio_crop(v,fwh,rsize,ctcrop,ncrop)
+        hw = v[0].shape[0:2]
+        c = v[0].shape[2]
+        if vscale is not None:
+            rsize = rng.uniform(vscale[0],vscale[1])
+            newsize = [int(hw[i]*rsize) for i in range(2)]
+            for fid in range(len(v)):
+                v[fid] = cv2.resize(v[fid],tuple(newsize))
+
+        vs = self.do_crop(v,intraratio,ctcrop,ncrop)
         
-        if flipf:
-            print("Doing flipping")
-            gotoprocess = np.random.randint(2)==1
-            if gotoprocess:
-                for fid in range(len(v)):
-                    v[fid] = np.flip(v[fid],1)
-        return v
+        for vid in range(len(vs)):
+            doflipf = flipf and np.random.randint(2)==1
+            for fid in range(len(vs[vid])):
+                vs[vid][fid] = cv2.resize(vs[vid][fid],tuple(fwh))
+                if doflipf:
+                    vs[vid][fid] = np.flip(vs[vid][fid],1)
+                if c==1:
+                    vs[vid][fid] = np.expand_dims(vs[vid][fid],axis=-1)
+
+        return vs
         
     def gen_batch(self,opt="np",bsz=10,isshuffle=True,merge_sgch=False,n=1,**kargs):
         if opt=="np":
@@ -327,10 +307,6 @@ class sthsth(object):
         else:
             fwh = wh
 
-        # if isgrey:
-        #     data = np.zeros((bsz,nseg,fwh[1],fwh[0],1))
-        # else:
-        #     data = np.zeros((bsz,nseg,fwh[1],fwh[0],3))
         data = []
         target = []#[0 for i in range(bsz)]
 
@@ -338,25 +314,28 @@ class sthsth(object):
             if bid+1 > nv:
                 break
 
+            vframes = self.get_video(vnum=vid,isgrey=isgrey)#,isshow=check_bsz,ts=50)
+            cutpoints = np.linspace(0,len(vframes),nseg+1,endpoint=True).astype(np.int16)
+            
+            selframes = []
+            for pid in range(1,len(cutpoints)):
+                selid = rng.choice(range(cutpoints[pid-1],cutpoints[pid]),1,replace=False)[0]
+                selframes.append(vframes[selid])
+            
+            augvideos = None
             if augconf is not None:
-                v = self.get_video(vnum=vid,isgrey=isgrey)#,isshow=check_bsz,ts=50)
-                batch_v = self.video_augs(v,**augconf)
+                augvideos = self.video_augs(selframes,**augconf)
             else:
-                batch_v = [self.get_video(vnum=vid,wh=fwh,isgrey=isgrey)]#,isshow=check_bsz,ts=50)
-            nv_inbatchv = len(batch_v)
-            for bvid,v in enumerate(batch_v):
-                temp_v = []
-                data_patch = np.linspace(0,len(batch_v[bvid]),nseg+1,endpoint=True).astype(np.int16)
-                for pid in range(1,len(data_patch)):
-                    fid = rng.choice(range(data_patch[pid-1],data_patch[pid]),1,replace=False)[0]
-                    # if isgrey:
-                    #     data[bid,pid-1] = np.expand_dims(v[fid],axis=-1)
-                    # else:
-                    #     data[bid,pid-1] = v[fid]
-                    temp_v.append(v[fid])
-                temp_v = np.array(temp_v)
-                data.append(temp_v)
-                target.append(self._getLabelId(vid))
+                for fid in range(len(selframes)):
+                    selframes[fid] = cv2.resize(selframes[fid],tuple(fwh))
+                augvideos = [selframes]
+            
+            tag = self._getLabelId(vid)
+            for augv in augvideos:
+                augv = np.array(augv)
+                data.append(augv)
+                target.append(tag)
+
         data,target = shuffle(data,target)
         data = np.array(data)
         # print(data.shape)
@@ -371,278 +350,3 @@ class sthsth(object):
                 cv2.destroyWindow("frames_{}".format(vname))
         # print("end get_batch")
         return data, target
-# class lfw_face(object):
-#     def __init__(self,rootF,**kargs):
-#         assert rootF is not None, "No path to dataset"
-#         self.rootFo = rootF
-#         self.verbose = True if "verbose" not in kargs.keys() else kargs["verbose"]
-#         self.outFo = "/opt" if "prog_output" not in kargs.keys() else kargs["prog_output"]
-#         self.useAllClasses = False if "use_all" not in kargs.keys() else kargs["use_all"]
-        
-#         self.labelFi = "AllLabels.txt" if "alllabels_file" not in kargs.keys() else kargs["alllabels_file"]
-#         self.allLabels_file = os.path.join(self.outFo,self.labelFi)
-#         self.nAllClasses = None
-#         self.allLabels = None
-#         self._getAllLabels()
-        
-#         self.focuslabelFi = "train_0.txt" if "sublabels_file" not in kargs.keys() else kargs["sublabels_file"]
-#         self.focusLabels_file = os.path.join(self.outFo,self.focuslabelFi)
-#         # self.focus_rate will be used if focuslabelFi does not exist
-#         self.focus_rate = 0.7 if "focus_rate" not in kargs.keys() else kargs["focus_rate"]
-#         self.nFocusClasses = None
-#         self.focusLabels = None
-#         if self.useAllClasses:
-#             self.focusLabels = self.allLabels
-#             self.nFocusClasses = self.nAllClasses
-#             if self.verbose:
-#                 print("Focus classes has {} identified people.".format(self.nFocusClasses))
-
-#         else:
-#             self._getFocusLabels()
-        
-#         self.faceList = self._getFaceList()
-#         if self.verbose:
-#             nc = [len(l) for l in self.faceList]
-#             n = np.sum(np.array(nc))
-#             print("There are {} images for {} identified faces".format(n,self.nFocusClasses))
-        
-#         self.maskedFaceRootFo = None if "maskedface" not in kargs.keys() else kargs["maskedface"]
-#         if self.maskedFaceRootFo is not None:
-#             self.maskfaceList = self._getFaceList(group="maskface")
-#             for index in range(len(self.maskfaceList)):
-#                 assert self._getId(self.maskfaceList[index][0].split("/")[0]) == self._getId(self.faceList[index][0].split("/")[0]), "not synchonize between faceList and maskfaceList at "+str(index)
-#             if self.verbose:
-#                 nc = [len(l) for l in self.maskfaceList]
-#                 n = np.sum(np.array(nc))
-#                 print("There are {} images for {} identified faces".format(n,self.nFocusClasses))
-#         else:
-#             self.maskfaceList = None
-#     #####
-#     def getFaceList(self,group="face",fullpath=False,withlabelId=False):
-#         if fullpath:
-#             tmp = self.faceList if group=="face" else self.maskfaceList
-#             rootFo = self.rootFo if group=="face" else self.maskedFaceRootFo
-#             Flist = []
-#             for l in tmp:
-#                 for lf in l:
-#                     Flist.append(os.path.join(rootFo,lf))
-#         else: 
-#             Flist = self.faceList if group=="face" else self.maskfaceList
-#         if withlabelId:
-#             # labelIds = []
-#             # for l in Flist:
-#             #     print(l)
-#             #     labelIds.append(self._getId(l.split("/")[-2]))
-#             labelIds = [self._getId(l.split("/")[-2]) for l in Flist]
-#             return [Flist,labelIds]
-#         else:
-#             return Flist
-#     def getnClasses(self):
-#         return self.nAllClasses
-#     def getAllIds(self):
-#         idList = np.zeros((1,len(self.focusLabels)))
-#         idx = -1
-#         for k,v in self.focusLabels.items():
-#             idx += 1
-#             idList[0,idx] = int(v)
-#         return idList
-#     def getId(self,labels):
-#         return [self._getId(l) for l in labels]
-        
-#     def getRefList(self,nr=1,group="face",fullpath=False):
-#         fList = self.faceList if group=="face" else self.maskfaceList
-#         rootFo= self.rootFo if group=="face" else self.maskedFaceRootFo
-#         ns = [len(l) for l in fList]
-#         min_ns = min(nr,min(ns))
-#         refIList = []
-#         refLList = []
-#         for l in fList:
-#             samples = rng.choice(len(l),min_ns,replace=False)
-#             for s in samples:
-#                 if fullpath:
-#                     refIList.append(os.path.join(rootFo,l[s]))
-#                 else:
-#                     refIList.append(l[s])
-#                 refLList.append(self._getId(l[s].split("/")[0]))
-
-#         return [refIList,refLList],min_ns
-    
-#     #####
-#     def _getId(self,label):
-#         return self.focusLabels[label]
-#     def _getAllLabels(self):
-#         if not os.path.isfile(self.allLabels_file): # get from data root folder and write down file
-#             print(self.rootFo)
-#             Ids = [f.path.split("/")[-1] for f in os.scandir(self.rootFo) if f.is_dir()]
-#             print(Ids)
-#             self.nAllClasses = len(Ids)
-#             self.allLabels = {Ids[i]:i for i in range(self.nAllClasses)}
-
-#             ofw = open(self.allLabels_file,"w")
-#             for k in self.allLabels.keys():
-#                 ofw.write(k+" "+str(self.allLabels[k])+"\n")
-#             ofw.close() 
-
-#         else: # load from file
-#             ofw = open(self.allLabels_file,"r")
-#             label_list = ofw.readlines()
-#             ofw.close()
-#             self.nAllClasses = len(label_list)
-#             self.allLabels = {label_list[i].split(" ")[0]:int(label_list[i].split(" ")[1])for i in range(self.nAllClasses)}
-        
-#         # # sort list follow id
-#         # tmp = ['' for i in range(self.nAllClasses)]
-#         # for k,v in self.allLabels.items():
-#         #     tmp[v] = k+"*"+str(v)
-
-#         # self.allLabels = {tmp[i].split("*")[0]:int(tmp[i].split("*")[1]) for i in range(self.nAllClasses)}
-#         # for k,v in self.allLabels.items():
-#         #     print("{}: {}".format(k,v))
-#         if self.verbose:
-#             print("LFW has {} identified people.".format(self.nAllClasses))
-                
-#         return True
-
-#     def _getFocusLabels(self):
-#         if os.path.isfile(self.focusLabels_file): # load from file
-#             ofw = open(self.focusLabels_file,"r")
-#             label_list = ofw.readlines()
-#             ofw.close()
-#             self.nFocusClasses = len(label_list)
-#             self.focusLabels = {label_list[i].split(" ")[0]:int(label_list[i].split(" ")[1])for i in range(self.nFocusClasses)}
-#         else: # split from AllLabels and save to file
-#             assert self.allLabels is not None, "Please load All labels first"
-#             splitP = int(self.nAllClasses*self.focus_rate)
-
-#             focusLabels = shuffle(range(self.nAllClasses))[:splitP]
-            
-#             self.nFocusClasses = splitP
-#             self.focusLabels = {}
-#             restlabels = {}
-#             for k,v in self.allLabels.items():
-#                 if v in focusLabels:
-#                     self.focusLabels[k] = v
-#                 else:
-#                     restlabels[k] = v
-            
-#             # save focuslabels:
-#             ofw = open(self.focusLabels_file,"w")
-#             for k in self.focusLabels.keys():
-#                 ofw.write(k+" "+str(self.focusLabels[k])+"\n")
-#             ofw.close()
-            
-#             # save the rest labels
-#             rest_file = os.path.join(self.outFo,"rest_"+self.focuslabelFi)
-#             ofw = open(rest_file,"w")
-#             for k in restlabels.keys():
-#                 ofw.write(k+" "+str(restlabels[k])+"\n")
-#             ofw.close()
-        
-#         # # sort list follow id
-#         # tmp = ['' for i in range(self.nAllClasses)]
-#         # for k,v in self.focusLabels.items():
-#         #     tmp[v] = k+"*"+str(v)
-#         # self.focusLabels = {tmp[i].split("*")[0]:int(tmp[i].split("*")[1]) for i in range(self.nAllClasses) if len(tmp[i])>0}
-        
-#         if self.verbose:
-#             print("Focus classes has {} identified people.".format(self.nFocusClasses))
-
-#         return True
-    
-#     def _getFaceList(self,group="face"):
-#         assert self.focusLabels is not None, "Please update focusLabels first by execute a function _getFocusLabels()"
-    
-#         tmp = [[] for i in range(self.nAllClasses)]
-    
-#         for l,v in self.focusLabels.items():
-#             if group == "face":
-#                 watchF = os.path.join(self.rootFo,l)
-#             elif group == "maskface":
-#                 watchF = os.path.join(self.maskedFaceRootFo,l)
-#             else:
-#                 raise ValueError("group param expect 'face' or 'maskface' but got '{}'".format(group))
-            
-#             for f in os.scandir(watchF):
-#                 subnames = f.path.split("/")
-#                 tmp[v].append(subnames[-2]+"/"+subnames[-1])
-        
-#         faceList = [tmp[i] for i in range(self.nAllClasses) if len(tmp[i])>0]
-        
-#         return faceList
-
-#     def load_samples(self,samples=None,**kargs):
-#         if samples is None:
-#             print("No samples to load")
-#             return None,None
-#         imgs = [i for i in samples]
-#         labels = [i for i in samples]
-#         for sid,s in enumerate(samples):
-#             imgs[sid],labels[sid] = self.load_sample(sample=s,**kargs)
-#         return imgs,labels
-
-#     def load_sample(self,sample=None,face_type="face",wh=None,isshow=False):
-#         '''
-#         sample: is in format "label/img.jpg"
-#         '''
-
-#         assert sample is not None, "No sample is provided"
-#         image_root = self.rootFo if face_type=="face" else self.maskedFaceRootFo
-#         I = cv2.imread(os.path.join(image_root,sample))
-#         if wh is not None:
-#             I = cv2.resize(I,(wh[1],wh[0]))
-#         label = sample.split("/")[0]
-#         if isshow:
-#             cv2.imshow(label,I)
-#             cv2.waitKey()
-#             cv2.destroyWindow(label)
-#         return I, label
-    
-#     ######################################################
-#     def full_mask_face_pair_gen(self,**kargs):
-#         while True:
-#             pairs,targets = self.load_fullface_maskface_pair(**kargs)
-#             yield (pairs,targets)
-
-#     def load_fullface_maskface_pair(self,wh=None,bz=20,check_pair=False):
-#         matchn = int(bz/2)
-#         targets = np.zeros((bz,1))
-#         targets[0:matchn,0] = 1 # match
-#         pairs = [[] for i in range(2)]
-#         fullface_label_col = []
-#         maskface_label_col = []
-#         for bzid in range(bz):
-#             fid = rng.randint(0,len(self.faceList))
-#             # make sure maskface has image
-#             while len(self.maskfaceList[fid])==0:
-#                 fid = rng.randint(0,len(self.faceList))
-#             fullface_label_col.append(self._getId(self.faceList[fid][0].split("/")[0]))
-#             imgid = rng.choice(len(self.faceList[fid]),1,replace=False)[0]
-            
-#             fullfaceI,_ = self.load_sample(self.faceList[fid][imgid],face_type="face",wh=wh)
-#             pairs[0].append(fullfaceI)
-#             if bzid >= matchn:
-#                 ct = True
-#                 while ct:
-#                     nfid = rng.randint(0,len(self.faceList))
-#                     if nfid != fid and len(self.maskfaceList[nfid])>0:
-#                         ct = False
-#                 fid = nfid
-#             maskface_label_col.append(self._getId(self.faceList[fid][0].split("/")[0]))
-#             imgid = rng.choice(len(self.maskfaceList[fid]),1,replace=False)[0]
-#             maskfaceI,_ = self.load_sample(self.maskfaceList[fid][imgid],face_type="maskface",wh=wh)
-#             pairs[1].append(maskfaceI)
-        
-#         pairs[0],pairs[1],targets,maskface_label_col,fullface_label_col = shuffle(pairs[0],
-#                                                                                   pairs[1],
-#                                                                                   targets,maskface_label_col,
-#                                                                                   fullface_label_col)
-#         pairs[0] = np.array(pairs[0])
-#         pairs[1] = np.array(pairs[1])
-#         if check_pair:
-#             for k in range(bz):
-#                 cv2.imshow("{}_{}_0".format(fullface_label_col[k], targets[k,0]),pairs[0][k])
-#                 cv2.imshow("{}_{}_1".format(maskface_label_col[k], targets[k,0]),pairs[1][k])
-#                 cv2.waitKey()
-#                 cv2.destroyAllWindows()
-#         return pairs,targets
-        

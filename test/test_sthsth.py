@@ -15,8 +15,8 @@ test_config = {}
 test_config["get_video"] = False
 test_config["_getLabelId"] = False
 test_config["_getLabelDes"] = False
-test_config["get_batch"] = True
-test_config["gen_batch_np"] = False
+test_config["get_batch"] = False
+test_config["gen_batch_np"] = True
 test_config["gen_batch_tf"] = False
 test_config["get_hist_vlength"] = False
 test_config["merge_segchg"] = False
@@ -42,17 +42,22 @@ if test_config["get_batch"]:
     print("test get_batch")
     augconf = {}
     augconf["fwh"] = [100,100]
-    augconf["kratio"] = True
-    augconf["minsz"] = 101
-    augconf["rsize"] = 2.0
+    augconf["intraratio"] = 0.85
     augconf["ctcrop"] = False
-    augconf["ncrop"] = 1
-    augconf["flipf"] = True
+    augconf["ncrop"] = 5
+    augconf["vscale"] = [0.7,1.5]
     sthsth_data.get_batch(nv=5,wh=[100,100],check_bsz=True,augconf=augconf)
 
 if test_config["gen_batch_np"]:
     print("test gen_batch_np")
-    batch_gen = sthsth_data.gen_batch(opt="np",isshuffle=True,bsz=5,wh=[130,100],check_bsz=True,ts=1000)
+    augconf = {}
+    augconf = {}
+    augconf["fwh"] = [100,100]
+    augconf["intraratio"] = 0.85
+    augconf["ctcrop"] = False
+    augconf["ncrop"] = 5
+    augconf["vscale"] = [0.7,1.5]
+    batch_gen = sthsth_data.gen_batch(opt="np",isshuffle=True,bsz=3,wh=[130,100],check_bsz=True,ts=1000)#,augconf=augconf)
     for _ in range(5):
         print("start gen batch")
         d,t = next(batch_gen)
@@ -61,7 +66,13 @@ if test_config["gen_batch_np"]:
 
 if test_config["gen_batch_tf"]:
     print("test gen_batch_tf")
-    batch_gen = sthsth_data.gen_batch(opt="tf",isshuffle=True,bsz=5,wh=[130,100],check_bsz=True,ts=1000)
+    augconf = {}
+    augconf["fwh"] = [100,100]
+    augconf["intraratio"] = 0.85
+    augconf["ctcrop"] = False
+    augconf["ncrop"] = 5
+    augconf["vscale"] = [0.7,1.5]
+    batch_gen = sthsth_data.gen_batch(opt="tf",isshuffle=True,bsz=1,wh=[130,100],check_bsz=True,ts=1000)#,augconf=augconf)
     for idx in range(5):
         print("start gen batch")
         d,t = batch_gen.__getitem__(idx)
