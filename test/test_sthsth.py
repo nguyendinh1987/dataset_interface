@@ -14,10 +14,10 @@ config["verbose"] = True
 sthsth_data = sthsth(**config)
 test_config = {}
 test_config["get_video"] = False
-test_config["_getLabelId"] = False
+test_config["_getLabelId"] = True
 test_config["_getLabelDes"] = False
 test_config["get_batch"] = False
-test_config["gen_batch_np"] = True
+test_config["gen_batch_np"] = False
 test_config["gen_batch_tf"] = False
 test_config["get_hist_vlength"] = False
 test_config["merge_segchg"] = False
@@ -31,7 +31,7 @@ if test_config["get_video"]:
 
 if test_config["_getLabelId"]:
     print("test _getLabelId")
-    lid = sthsth_data._getLabelId(vnum=74927)
+    lid = sthsth_data._getLabelId(vnum=68044)
     print(lid)
 
 if test_config["_getLabelDes"]:
@@ -72,18 +72,25 @@ if test_config["gen_batch_tf"]:
     print("test gen_batch_tf")
     augconf = {}
     augconf["fwh"] = [100,100]
-    augconf["intraratio"] = 0.85
+    augconf["intraratio"] = 0.7
     augconf["keepratio"] = False
     augconf["change_intraratio"]=True
     augconf["ctcrop"] = False
     augconf["ncrop"] = 5
     augconf["vscale"] = [0.7,1.5]
-    batch_gen = sthsth_data.gen_batch(opt="tf",isshuffle=True,bsz=1,wh=[130,100],check_bsz=True,ts=1000)#,augconf=augconf)
-    for idx in range(5):
-        print("start gen batch")
+    batch_gen = sthsth_data.gen_batch(opt="tf",isshuffle=True,bsz=1,wh=[130,100],ngenclips=3,check_bsz=False,ts=10,augconf=augconf)
+    for idx in range(2):
+        if idx%100==0:
+            print("-->[{}/20000]".format(idx))
         d,t = batch_gen.__getitem__(idx)
-        print(d.shape)
-        print(t)
+        bz,nseg,_,_,_ = d.shape
+        for bid in range(bz):
+            vname = sthsth_data._getLabelDes(t[bid])    
+            for fid in range(nseg):
+                cv2.imshow("{}".format(vname),d[bid,fid]/255)
+                cv2.waitKey(500)
+            cv2.destroyWindow("{}".format(vname))
+            print("Done one clip")
 
 if test_config["get_hist_vlength"]:
     print("test get_hist_vlength")

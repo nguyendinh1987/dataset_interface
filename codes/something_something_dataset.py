@@ -60,8 +60,8 @@ class sthsth(object):
     def _getLabelId(self,vnum):
         findex = self.files[self.files[0]==vnum].index.tolist()[0]
         fdes = self.files.iloc[findex][1:3]
-        # print((self.labels[0]==fdes[1]) & (self.labels[1]==fdes[2]))
-        # print(self.labels[0]==fdes[0])
+        # print("{}:{}".format(fdes[1],fdes[2]))
+        
         lid = self.labels[(self.labels[0]==fdes[1]) & (self.labels[1]==fdes[2])].index.tolist()[0]
         # if self.verbose:
         #     print("vnum: {}; lid: {}; des: {}".format(vnum,lid,fdes))
@@ -309,7 +309,7 @@ class sthsth(object):
                 # print("end gen_batch")
                 yield (data,target)
 
-    def get_batch(self,vlist = None, nv = 1, nseg=8, wh = None, isgrey=False, augconf = None, check_bsz = False,ts=150):
+    def get_batch(self,vlist = None, nv = 1,ngenclips=1, nseg=8, wh = None, isgrey=False, augconf = None, check_bsz = False,ts=150):
         if vlist is None:
             fcids = rng.choice(self.files.shape[0],nv,replace=False)
             vlist = self.files[0][fcids]
@@ -334,11 +334,18 @@ class sthsth(object):
 
             vframes = self.get_video(vnum=vid,isgrey=isgrey)#,isshow=check_bsz,ts=50)
             cutpoints = np.linspace(0,len(vframes),nseg+1,endpoint=True).astype(np.int16)
+            nidsset = [cutpoints[i]-cutpoints[i-1] for i in range(1,nseg+1)]
             
             selframes = []
-            for pid in range(1,len(cutpoints)):
-                selid = rng.choice(range(cutpoints[pid-1],cutpoints[pid]),1,replace=False)[0]
-                selframes.append(vframes[selid])
+            for genclipid in range(ngenclips):
+                tmp_selframes = []
+                for pid in range(1,len(cutpoints)):
+                    if genclipid < nidsset[pid-1]:
+                        selid = cutpoints[pid-1] + genclipid
+                    else:
+                        selid = rng.choice(range(cutpoints[pid-1],cutpoints[pid]),1,replace=False)[0]
+                    tmp_selframes.append(vframes[selid])
+                selframes.extend(tmp_selframes)
             
             augvideos = None
             if augconf is not None:
