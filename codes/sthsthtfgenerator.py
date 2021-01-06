@@ -28,6 +28,12 @@ class sthsthtfgen(Sequence):
     def __len__(self):
         return self.nbatches_train #np.ceil(len(self.filelist)/float(self.bts)).astype(np.int16)
     
+    def on_epoch_end(self):
+        'Updates indexes after each epoch'
+        if self.isshuffle:
+            print("Doing shuffle data")
+            self.filelist = shuffle(self.filelist)
+
     def __getitem__(self,idx):
         # print("{} of {}".format(p+1,npatches))
         internal_bsz = min((idx+1)*self.bts,self.nfiles)-idx*self.bts
@@ -41,7 +47,7 @@ class sthsthtfgen(Sequence):
         if self.merge_sgch:
             data = self.dataobj.merge_segchg(data)
         # shuffle list when last sample is loaded
-        if idx+1 == self.nbatches and self.isshuffle:
-            print("Doing shuffle data [{}]".format(idx+1))
-            self.filelist = shuffle(self.filelist)
+        # if idx+1 == self.nbatches_train and self.isshuffle:
+        #     print("Doing shuffle data [{}]".format(idx+1))
+        #     self.filelist = shuffle(self.filelist)
         return (data,target)

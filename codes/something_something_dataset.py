@@ -76,18 +76,19 @@ class sthsth(object):
         return self.labels.shape[0]
     def get_labels(self):
         return self.labels[0].tolist()
+    
     def get_nvideos_per_label(self,l=None):
         if l is None:
-            return None
+            return self.files[0].values.shape[0]
         else:
             vindices = self.files[self.files[1]==l].index.tolist()
             vlist = self.files.iloc[vindices][0].tolist()
             return len(vlist),vlist
 
-    def get_video(self,vnum = None,wh = None, rootF = "20bn-something-something-v1",isshow=False,ts=15,isgrey=False):
+    def get_video(self,vnum = None,wh = None,isshow=False,ts=15,isgrey=False):
         if vnum is None:
             vnum = self.files.iloc[rng.randint(0,self.files.shape[0])][0]
-        path_to_video = os.path.join(self.rootFo,rootF,str(vnum))
+        path_to_video = os.path.join(self.rootFo,str(vnum))
         frame_list = glob.glob(path_to_video+"/*.jpg")
         frame_nums = [int(fn.split("/")[-1].split(".")[0]) for fn in frame_list]
         frame_indices = np.argsort(frame_nums)
@@ -125,12 +126,12 @@ class sthsth(object):
         # print(vlist)
         return vlist
     
-    def get_hist_vlength(self,rootF = "20bn-something-something-v1"):
+    def get_hist_vlength(self):
         vl = [0 for i in range(self.files.shape[0])]
         for f in range(len(vl)):
             if f%50==0:
                 print("process [{}/{}]".format(f,self.files.shape[0]))
-            path_to_video = os.path.join(self.rootFo,rootF,str(self.files.iloc[f][0]))
+            path_to_video = os.path.join(self.rootFo,str(self.files.iloc[f][0]))
             frames = glob.glob(path_to_video+"/*.jpg")
             assert len(frames)>0, "Error reading {}".format(path_to_video)
             vl[f] = len(frames)
@@ -268,7 +269,7 @@ class sthsth(object):
         
     def gen_batch(self,opt="np",bsz=10,isshuffle=True,merge_sgch=False,n=1,**kargs):
         if opt=="np":
-            return self.gen_batch_np(bsz=bsz,isshuffle=isshuffle,merge_sgch=merge_sgch,**kargs)
+            return self.gen_batch_np(bsz=bsz,isshuffle=isshuffle,merge_sgch=merge_sgch,n=n,**kargs)
         elif opt=="tf":
             return self.gen_batch_tf(bsz=bsz,isshuffle=isshuffle,merge_sgch=merge_sgch,n=n,**kargs)
         else:
@@ -287,6 +288,8 @@ class sthsth(object):
         npatches = np.floor(nfiles/bsz).astype(np.int16)
         if npatches*bsz < nfiles:
             npatches += 1
+        if n is not None: 
+            npatches = np.floor(npatches/n).astype(np.int16)
         # print(npatches)
         
         while True:
@@ -309,7 +312,13 @@ class sthsth(object):
                 # print("end gen_batch")
                 yield (data,target)
 
-    def get_batch(self,vlist = None, nv = 1,ngenclips=1, nseg=8, wh = None, isgrey=False, augconf = None, check_bsz = False,ts=150):
+    def get_batch(self,vlist = None, 
+                  nv = 1,ngenclips=1, nseg=8, wh = None, 
+                  isgrey=False, augconf = None, 
+                  check_bsz = False,ts=150,
+                  unit_scale=False,
+                  submean=False,
+                  norm=True):
         if vlist is None:
             fcids = rng.choice(self.files.shape[0],nv,replace=False)
             vlist = self.files[0][fcids]
@@ -363,6 +372,7 @@ class sthsth(object):
 
         data,target = shuffle(data,target)
         data = np.array(data)
+
         # print(data.shape)
         if check_bsz:
             for bid in range(data.shape[0]):
@@ -373,5 +383,26 @@ class sthsth(object):
                     cv2.imshow("frames_{}".format(vname),data[bid,fid]/255)
                     cv2.waitKey(ts)
                 cv2.destroyWindow("frames_{}".format(vname))
+
+        #### DO NORMALIZATION
+        if norm:
+            unit_scale = False
+            submean = False
+            
+            ## global norm
+            scale_data = data/255.0
+            data = (scale_data-0.5)/0.5
+            
+            ## local norm
+            # data = data/np.linalg.norm(data)
+            # for bid in range(data.shape[0]):
+            #     for segid in range(data.shape[1]):
+            #         data[bid,segid] = (data[bid,segid]-np.mean(data[bid,segid]))/0.2#/(np.nan_to_num(np.std(data[bid,segid]))+1e-5)
+
+        if unit_scale:
+            data = data/np.max(data)
+        if submean:
+            data = data - np.mean(data)            
+        
         # print("end get_batch")
         return data, target

@@ -5,10 +5,10 @@ from codes.something_something_dataset import sthsth
 import cv2
 
 config = {}
-config["rootF"] = "/opt/Data/sthsthV1"
+config["rootF"] = "/opt/Data/sthsthv1/videos"
 config["mode"] = "train"
-config["alllabels_file"] = "/opt/Data/sthsthV1/datasplit_label/something-something-v1-labels.csv"
-config["filelistFi"] = "/opt/Data/sthsthV1/datasplit_label/something-something-v1-validation.csv"
+config["alllabels_file"] = "/opt/Data/sthsthv1/annotations/something-something-v1-labels.csv"
+config["filelistFi"] = "/opt/Data/sthsthv1/annotations/something-something-v1-validation.csv"
 config["verbose"] = True
 
 sthsth_data = sthsth(**config)
